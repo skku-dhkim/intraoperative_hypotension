@@ -36,6 +36,9 @@ def make_dataset(data_path: str,
             df = normalization(df, norm, file_save=file_save, dataset_path=data_path)
     else:
         if norm:
+            if not os.path.exists("{}/normalized_dataset.csv".format(data_path)):
+                df = pd.read_csv('{}/labeled_dataset.csv'.format(data_path))
+                _ = normalization(df, norm, file_save=True, dataset_path=data_path)
             file_path = '{}/normalized_dataset.csv'.format(data_path)
         else:
             file_path = '{}/labeled_dataset.csv'.format(data_path)

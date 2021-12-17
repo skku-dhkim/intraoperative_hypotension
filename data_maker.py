@@ -33,7 +33,7 @@ if __name__ == '__main__':
                   "BIS/BIS"]
     if args.data_load:
         # 1. load from vital DB framework
-        dl.data_load(args.dset_name, attributes, args.maxcase)
+        dl.data_load(args.dset_path, attributes, args.maxcase)
         prep.make_dataset(
             args.dset_path,
             attr=attributes,

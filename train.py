@@ -27,13 +27,12 @@ vital_dataset = VitalDataset(x_tensor=data_x, y_tensor=data_y)
 train_loader = DataLoader(dataset=vital_dataset, batch_size=batch_size, shuffle=True)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# device = 'cpu'
 
 model = ValinaLSTM(input_size, hidden_units, layers).to(device)
-# model.double()
+
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.RMSprop(model.parameters(), lr=0.0001)
 
-hidden = (torch.randn(layers, batch_size, hidden_units, device=device), 
-        torch.randn(layers, batch_size, hidden_units, device=device))
+hidden = (torch.randn(layers, batch_size, hidden_units, device=device),
+          torch.randn(layers, batch_size, hidden_units, device=device))
 train(train_loader=train_loader, model=model, epochs=epochs, optimizer=optimizer, loss_fn=criterion, device=device, summary_path='./logs/test1/', step_count=1000, hidden=hidden)

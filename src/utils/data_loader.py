@@ -63,7 +63,6 @@ class VitalDataset(Dataset):
     def __getitem__(self, index):
         x = torch.FloatTensor(self.x[index])
         y = self.y[index]
-        print(type(y))
         return x, y
 
     def __len__(self):

@@ -18,6 +18,8 @@ def train(data_loader,
     # TODO: Tensorboard need to be fixed.
     writer = SummaryWriter(log_dir=summary_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
+
     best_acc = 0
 
     if 'step_count' in kwargs.keys():
@@ -45,6 +47,7 @@ def train(data_loader,
         for x, y in pbar:
             input_x = x.to(device)
             target_y = y.to(device)
+            print(target_y)
 
             if hidden:
                 hidden = model.init_hidden(input_x.shape[0], device)

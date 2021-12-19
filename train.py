@@ -19,31 +19,31 @@ epochs = 10
 model_name = 'LSTM'
 log_path = './logs/LSTM'
 
-# f = h5py.File('./data/dataset/train_2021-12-17-17:43.hdf5', 'r')
-#
-# data_x = f['train']['x']
-# data_y = f['train']['y']
-# print("Data x shape: {}".format(data_x.shape))
-# print("Data y shape: {}".format(data_y.shape))
-#
-# f2 = h5py.File('./data/dataset/test_2021-12-17-17:43.hdf5', 'r')
-#
-# test_x = f2['test']['x']
-# test_y = f2['test']['y']
-# print("Test Data x shape: {}".format(test_x.shape))
-# print("Test Data y shape: {}".format(test_y.shape))
+f = h5py.File('./data/dataset/train_2021-12-18-14:27.hdf5', 'r')
+
+data_x = f['train']['x']
+data_y = f['train']['y']
+print("Data x shape: {}".format(data_x.shape))
+print("Data y shape: {}".format(data_y.shape))
+
+f2 = h5py.File('./data/dataset/test_2021-12-18-14:36.hdf5', 'r')
+
+test_x = f2['test']['x']
+test_y = f2['test']['y']
+print("Test Data x shape: {}".format(test_x.shape))
+print("Test Data y shape: {}".format(test_y.shape))
 
 # NOTE: This code for testing in MAC
-sequences = 60
-data_x = np.random.rand(1000, sequences, input_size)
-data_y = np.random.randint(3, size=1000)
-print(data_x.shape)
-print(data_y.shape)
-
-test_x = np.random.rand(200, sequences, input_size)
-test_y = np.random.randint(3, size=200)
-print(test_x.shape)
-print(test_y.shape)
+# sequences = 180
+# data_x = np.random.rand(1000, sequences, input_size)
+# data_y = np.random.randint(3, size=1000)
+# print(data_x.shape)
+# print(data_y.shape)
+#
+# test_x = np.random.rand(200, sequences, input_size)
+# test_y = np.random.randint(3, size=200)
+# print(test_x.shape)
+# print(test_y.shape)
 #
 vital_dataset = VitalDataset(x_tensor=data_x, y_tensor=data_y)
 test_dataset = VitalDataset(x_tensor=test_x, y_tensor=test_y)

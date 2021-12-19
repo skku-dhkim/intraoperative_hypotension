@@ -48,6 +48,9 @@ def train(data_loader,
             input_x = x.to(device)
             target_y = y.to(device)
 
+            if input_x.isnan().any():
+                continue
+
             if hidden:
                 hidden = model.init_hidden(input_x.shape[0], device)
                 predicted = model(hidden, input_x)

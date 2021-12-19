@@ -13,21 +13,28 @@ class OneDimCNN(nn.Module):
             nn.MaxPool1d(kernel_size=2)
         )
         self.conv2 = nn.Sequential(
-            nn.Conv1d(32, init_channel*2, kernel_size=3),
+            nn.Conv1d(init_channel, init_channel*2, kernel_size=3),
             nn.ReLU(),
             nn.MaxPool1d(kernel_size=2)
         )
         self.conv3 = nn.Sequential(
-            nn.Conv1d(64, init_channel*4, kernel_size=3),
+            nn.Conv1d(init_channel*2, init_channel*4, kernel_size=3),
+            nn.ReLU(),
+            nn.MaxPool1d(kernel_size=2)
+        )
+
+        self.conv4 = nn.Sequential(
+            nn.Conv1d(init_channel*4, init_channel*4, kernel_size=3),
             nn.ReLU(),
             nn.MaxPool1d(kernel_size=2)
         )
 
         self.fc = nn.Sequential(
-            nn.Linear(640, 256),
+            nn.Linear(1152, 512),
+            nn.ReLU(),
+            nn.Linear(512, 256),
             nn.ReLU(),
             nn.Linear(256, 128),
-            nn.ReLU(128),
             nn.Linear(128, num_of_classes)
         )
 
@@ -36,6 +43,7 @@ class OneDimCNN(nn.Module):
         out = self.conv1(x)
         out = self.conv2(out)
         out = self.conv3(out)
+        out = self.conv4(out)
         out = nn.Flatten()(out)
         out = self.fc(out)
         return out

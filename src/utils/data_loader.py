@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import os
 import glob
+from torch.utils.data import DataLoader, Dataset
 
 
 def data_load(data_path, attr, maxcases):
@@ -12,7 +13,7 @@ def data_load(data_path, attr, maxcases):
     _attributes = attr[2:]
     _ = vitaldb.load_cases(
         tnames=_attributes,
-        path_for_save="./data/{}/original".format(data_path),
+        path_for_save="{}/original".format(data_path),
         interval=1,
         maxcases=maxcases
     )
@@ -50,4 +51,20 @@ def matching_caseID(data_path):
         print("[Done] Matching IDs...")
     except FileNotFoundError:
         raise FileNotFoundError("You should move or create \'total_cases.csv\' file first.")
-    # return "./data/{}/case_info.csv".format(data_path)
+
+
+class VitalDataset(Dataset):
+    def __init__(self, x_tensor, y_tensor):
+        super(Dataset, self).__init__()
+        self.x = np.array(x_tensor)
+        self.y = np.array(y_tensor)
+
+    def __getitem__(self, index):
+        x = torch.FloatTensor(self.x[index])
+        y = self.y[index]
+        print(type(y))
+        return x, y
+
+    def __len__(self):
+        return len(self.x)
+

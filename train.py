@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader, Dataset
 from src.utils.data_loader import VitalDataset
 from src.utils.train_function import train, test
 from src.models.rnn import ValinaLSTM
+from src.models.cnn import OneDimCNN
 
 batch_size = 128
 input_size = 7
@@ -18,27 +19,43 @@ epochs = 10
 model_name = 'LSTM'
 log_path = './logs/LSTM'
 
-f = h5py.File('./data/dataset/train_2021-12-17-17:43.hdf5', 'r')
+# f = h5py.File('./data/dataset/train_2021-12-17-17:43.hdf5', 'r')
+#
+# data_x = f['train']['x']
+# data_y = f['train']['y']
+# print("Data x shape: {}".format(data_x.shape))
+# print("Data y shape: {}".format(data_y.shape))
+#
+# f2 = h5py.File('./data/dataset/test_2021-12-17-17:43.hdf5', 'r')
+#
+# test_x = f2['test']['x']
+# test_y = f2['test']['y']
+# print("Test Data x shape: {}".format(test_x.shape))
+# print("Test Data y shape: {}".format(test_y.shape))
 
-data_x = f['train']['x']
-data_y = f['train']['y']
-print("Data x shape: {}".format(data_x.shape))
-print("Data y shape: {}".format(data_y.shape))
+# NOTE: This code for testing in MAC
+sequences = 60
+data_x = np.random.rand(1000, sequences, input_size)
+data_y = np.random.randint(3, size=1000)
+print(data_x.shape)
+print(data_y.shape)
 
-# # NOTE: This code for testing in MAC
-# sequences = 60
-# data_x = np.random.rand(1000, sequences, input_size)
-# data_y = np.random.randint(3, size=1000)
-# print(data_x.shape)
-# print(data_y.shape)
-# #
+test_x = np.random.rand(200, sequences, input_size)
+test_y = np.random.randint(3, size=200)
+print(test_x.shape)
+print(test_y.shape)
+#
 vital_dataset = VitalDataset(x_tensor=data_x, y_tensor=data_y)
+test_dataset = VitalDataset(x_tensor=test_x, y_tensor=test_y)
+
 train_loader = DataLoader(dataset=vital_dataset, batch_size=batch_size, shuffle=True)
-test_loader = DataLoader(dataset=vital_dataset, batch_size=data_x.shape[0], shuffle=False)
+test_loader = DataLoader(dataset=test_dataset, batch_size=test_x.shape[0], shuffle=False)
 
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-model = ValinaLSTM(input_size, hidden_units, layers, num_of_classes=3)
+# model = ValinaLSTM(input_size, hidden_units, layers, num_of_classes=3)
+model = OneDimCNN(input_size=input_size, num_of_classes=3)
+
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.01)
@@ -50,12 +67,12 @@ model = train(data_loader=train_loader,
               optimizer=optimizer,
               loss_fn=criterion,
               summary_path=log_path,
-              step_count=10,
+              step_count=2,
               model_path=log_path+"/checkpoint/",
-              hidden=True,
+              hidden=False,
               lr_scheduler=lr_sched)
 
-score = test(data_loader=test_loader, model=model, hidden=True)
+score = test(data_loader=test_loader, model=model, hidden=False)
 print("AUC score: {}".format(score))
 
 

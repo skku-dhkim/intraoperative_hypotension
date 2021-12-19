@@ -108,6 +108,7 @@ def test(data_loader, model, **kwargs):
                 _, predicted = torch.max(predicted.data, 1)
             else:
                 predicted = model(x)
+                _, predicted = torch.max(predicted.data, 1)
 
             fpr, tpr, thresholds = roc_curve(y, predicted, pos_label=0)
             score = auc(fpr, tpr)

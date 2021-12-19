@@ -47,7 +47,6 @@ def train(data_loader,
         for x, y in pbar:
             input_x = x.to(device)
             target_y = y.to(device)
-            print(target_y)
 
             if hidden:
                 hidden = model.init_hidden(input_x.shape[0], device)

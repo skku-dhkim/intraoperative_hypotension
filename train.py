@@ -9,18 +9,18 @@ from torch.utils.data import DataLoader, Dataset
 from src.utils.data_loader import VitalDataset
 from src.utils.train_function import train, test
 from src.models.rnn import ValinaLSTM
-from src.models.cnn import OneDimCNN, MultiChannelCNN
+from src.models.cnn import OneDimCNN, MultiChannelCNN, AttentionCNN
 
 batch_size = 256
 input_size = 7
-hidden_units = 256
+hidden_units = 128
 layers = 1
 epochs = 10
 
 step_count = 1000
 
-model_name = 'Multi-channel-CNN'
-log_path = './logs/Multi-channel-CNN'
+model_name = 'Attention-CNN'
+log_path = './logs/Attention-CNN'
 
 f = h5py.File('./data/dataset/train_2021-12-18-14:27.hdf5', 'r')
 
@@ -37,7 +37,7 @@ print("Test Data x shape: {}".format(test_x.shape))
 print("Test Data y shape: {}".format(test_y.shape))
 
 # NOTE: This code for testing in MAC
-# sequences = 180
+# sequences = 60
 # data_x = np.random.rand(1000, sequences, input_size)
 # data_y = np.random.randint(3, size=1000)
 # print(data_x.shape)
@@ -58,7 +58,8 @@ test_loader = DataLoader(dataset=test_dataset, batch_size=test_x.shape[0], shuff
 
 # model = ValinaLSTM(input_size, hidden_units, layers, num_of_classes=3)
 # model = OneDimCNN(input_size=input_size, num_of_classes=3)
-model = MultiChannelCNN(input_size=input_size, num_of_classes=3)
+# model = MultiChannelCNN(input_size=input_size, num_of_classes=3)
+model = AttentionCNN(input_size=input_size, embedding_dim=hidden_units, attention_dim=64, sequences=sequences, num_of_classes=3)
 
 
 criterion = nn.CrossEntropyLoss()

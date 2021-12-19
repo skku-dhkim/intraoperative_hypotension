@@ -51,6 +51,9 @@ def make_dataset(data_path: str,
     test_df = df.loc[df['CID'].isin(test_samples)].reset_index(drop=True)
     train_df = df.loc[~df['CID'].isin(test_samples)].reset_index(drop=True)
 
+    train_df = train_df.interpolate()
+    test_df = test_df.interpolate()
+
     train = data_split(train_df, time_seq=time_seq, target_seq=target_seq, d_type="train", d_path=data_path)
     test = data_split(test_df, time_seq=time_seq, target_seq=target_seq, d_type="test", d_path=data_path)
 
@@ -115,9 +118,6 @@ def data_split(dataframe: pd.DataFrame, time_seq: int, target_seq: int, d_path: 
     group.create_dataset("x", data=data_dict['x'])
     group.create_dataset("y", data=data_dict['y'])
     f.close()
-    # np.savez_compressed("{}/{}_{}.npz".format(d_path, d_type, date_time), x=data_dict['x'], y=data_dict['y'])
-    # np.save("./data/dataset/{}_x_{}.npy".format(d_type, date_time), data_dict['x'])
-    # np.save("./data/dataset/{}_y_{}.npy".format(d_type, date_time), data_dict['y'])
 
     return data_dict
 

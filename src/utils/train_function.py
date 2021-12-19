@@ -32,6 +32,7 @@ def train(train_loader, model, epochs, optimizer, loss_fn, device, summary_path,
                 output = model(hidden, input_x)
             else:
                 output = model(input_x)
+
             loss = loss_fn(output, target_y)
 
             optimizer.zero_grad()

@@ -58,7 +58,7 @@ class VitalDataset(Dataset):
     def __init__(self, x_tensor, y_tensor):
         super(Dataset, self).__init__()
         self.x = np.array(x_tensor)
-        self.y = np.array(y_tensor)
+        self.y = np.array(y_tensor, dtype=np.float)
 
     def __getitem__(self, index):
         x = torch.FloatTensor(self.x[index])

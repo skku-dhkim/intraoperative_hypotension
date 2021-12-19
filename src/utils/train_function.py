@@ -103,6 +103,7 @@ def test(data_loader, model, **kwargs):
         hidden = False
 
     device = "cpu"
+    model.to(device)
     with torch.no_grad():
         for x, y in data_loader:
             if hidden:

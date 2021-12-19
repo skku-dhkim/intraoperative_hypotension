@@ -9,15 +9,18 @@ from torch.utils.data import DataLoader, Dataset
 from src.utils.data_loader import VitalDataset
 from src.utils.train_function import train, test
 from src.models.rnn import ValinaLSTM
-from src.models.cnn import OneDimCNN
+from src.models.cnn import OneDimCNN, MultiChannelCNN
 
-batch_size = 128
+batch_size = 256
 input_size = 7
 hidden_units = 256
 layers = 1
 epochs = 10
-model_name = 'LSTM'
-log_path = './logs/LSTM'
+
+step_count = 1000
+
+model_name = 'Multi-channel-CNN'
+log_path = './logs/Multi-channel-CNN'
 
 f = h5py.File('./data/dataset/train_2021-12-18-14:27.hdf5', 'r')
 
@@ -44,7 +47,7 @@ print("Test Data y shape: {}".format(test_y.shape))
 # test_y = np.random.randint(3, size=200)
 # print(test_x.shape)
 # print(test_y.shape)
-#
+# #
 vital_dataset = VitalDataset(x_tensor=data_x, y_tensor=data_y)
 test_dataset = VitalDataset(x_tensor=test_x, y_tensor=test_y)
 
@@ -54,11 +57,12 @@ test_loader = DataLoader(dataset=test_dataset, batch_size=test_x.shape[0], shuff
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # model = ValinaLSTM(input_size, hidden_units, layers, num_of_classes=3)
-model = OneDimCNN(input_size=input_size, num_of_classes=3)
+# model = OneDimCNN(input_size=input_size, num_of_classes=3)
+model = MultiChannelCNN(input_size=input_size, num_of_classes=3)
 
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.01)
+optimizer = optim.Adam(model.parameters(), lr=0.001)
 lr_sched = optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.1)
 
 model = train(data_loader=train_loader,
@@ -67,7 +71,7 @@ model = train(data_loader=train_loader,
               optimizer=optimizer,
               loss_fn=criterion,
               summary_path=log_path,
-              step_count=2,
+              step_count=step_count,
               model_path=log_path+"/checkpoint/",
               hidden=False,
               lr_scheduler=lr_sched)

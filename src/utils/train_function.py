@@ -1,6 +1,8 @@
+import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+from sklearn.metrics import roc_curve, auc
 import os
 
 
@@ -13,7 +15,7 @@ def train(data_loader,
           model_path,
           **kwargs):
 
-    # TODO: Tensorbaord need to be fixed.
+    # TODO: Tensorboard need to be fixed.
     writer = SummaryWriter(log_dir=summary_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     best_acc = 0
@@ -22,10 +24,16 @@ def train(data_loader,
         step_count = kwargs['step_count']
     else:
         step_count = 1000
+
     if 'hidden' in kwargs.keys():
         hidden = kwargs['hidden']
     else:
         hidden = False
+
+    if 'lr_scheduler' in kwargs.keys():
+        lr_scheduler = kwargs['lr_scheduler']
+    else:
+        lr_scheduler = None
 
     for epoch in range(epochs):
         step_counter = 0
@@ -64,6 +72,9 @@ def train(data_loader,
                 writer.add_scalar('Loss/train', running_loss, epoch*step_counter+step_counter)
                 running_loss = 0
 
+        if lr_scheduler:
+            lr_scheduler.step()
+
         accuracy = correct/len(data_loader.dataset) * 100
         pbar.write("Epoch[{}] - Accuracy: {:.2f}".format(epoch, accuracy))
         pbar.close()
@@ -77,3 +88,25 @@ def train(data_loader,
             best_acc = accuracy
 
     writer.close()
+    return model
+
+
+def test(data_loader, model, **kwargs):
+    if 'hidden' in kwargs.keys():
+        hidden = kwargs['hidden']
+    else:
+        hidden = False
+
+    device = "cpu"
+    with torch.no_grad():
+        for x, y in data_loader:
+            if hidden:
+                hidden = model.init_hidden(x.shape[0], device)
+                predicted = model(hidden, x)
+                _, predicted = torch.max(predicted.data, 1)
+            else:
+                predicted = model(x)
+
+            fpr, tpr, thresholds = roc_curve(y, predicted, pos_label=0)
+            score = auc(fpr, tpr)
+    return score

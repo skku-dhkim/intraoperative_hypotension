@@ -48,8 +48,8 @@ def train(data_loader,
             input_x = x.to(device)
             target_y = y.to(device)
 
-            if input_x.isnan().any():
-                continue
+            # if input_x.isnan().any():
+            #     continue
 
             if hidden:
                 hidden = model.init_hidden(input_x.shape[0], device)
@@ -71,9 +71,11 @@ def train(data_loader,
             correct += (predicted == target_y).sum().item()
 
             pbar.update(1)
+            pbar.set_postfix({'Epochs': epoch, "loss": loss.item()})
+
             if step_counter % step_count == 0:
                 running_loss = running_loss / step_count
-                pbar.set_postfix({'Epochs': epoch, "loss": running_loss})
+                # pbar.set_postfix({'Epochs': epoch, "loss": running_loss})
                 writer.add_scalar('Loss/train', running_loss, epoch*step_counter+step_counter)
                 running_loss = 0
 
@@ -96,16 +98,20 @@ def train(data_loader,
     return model
 
 
-def test(data_loader, model, **kwargs):
+def test(data_loader, model, device, **kwargs):
     if 'hidden' in kwargs.keys():
         hidden = kwargs['hidden']
     else:
         hidden = False
 
-    device = "cpu"
     model.to(device)
     with torch.no_grad():
+        correct = 0
+        total_len = 0
         for x, y in data_loader:
+            x = x.to(device)
+            y = x.to(device)
+
             if hidden:
                 hidden = model.init_hidden(x.shape[0], device)
                 predicted = model(hidden, x)
@@ -114,6 +120,18 @@ def test(data_loader, model, **kwargs):
                 predicted = model(x)
                 _, predicted = torch.max(predicted.data, 1)
 
+            correct += (predicted == target_y).sum().item()
+            total_len += len(y)
+            accuracy = (correct/total_len) * 100
+            print("Accuracy: {}".format(correct/total_len))
+
+            score = 0
             fpr, tpr, thresholds = roc_curve(y, predicted, pos_label=0)
-            score = auc(fpr, tpr)
-    return score
+            score += auc(fpr, tpr)
+            fpr, tpr, thresholds = roc_curve(y, predicted, pos_label=1)
+            score += auc(fpr, tpr)
+            fpr, tpr, thresholds = roc_curve(y, predicted, pos_label=2)
+            score += auc(fpr, tpr)
+
+            score = score/3
+    return score, accuracy

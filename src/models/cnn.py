@@ -127,7 +127,7 @@ class Attention(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, input_size: int, embedding_dim: int, sequences: int):
+    def __init__(self, input_size: int, embedding_dim: int, sequences: int, device):
         super(Encoder, self).__init__()
         self.layers = []
         self.linear = nn.Sequential(
@@ -135,7 +135,7 @@ class Encoder(nn.Module):
             nn.ReLU()
         )
         for _ in range(input_size):
-            self.layers.append(copy.deepcopy(self.linear))
+            self.layers.append(copy.deepcopy(self.linear).to(device))
 
     def forward(self, x):
         x = x.transpose(1, 2)
@@ -149,10 +149,19 @@ class Encoder(nn.Module):
 
 
 class AttentionCNN(nn.Module):
-    def __init__(self, input_size: int, embedding_dim: int, attention_dim: int, sequences: int, num_of_classes: int):
+    def __init__(self,
+                 input_size: int,
+                 embedding_dim: int,
+                 attention_dim: int,
+                 sequences: int,
+                 num_of_classes: int,
+                 device):
         super(AttentionCNN, self).__init__()
-        self.encoder = Encoder(input_size=input_size, embedding_dim=embedding_dim, sequences=sequences)
-        self.attention = Attention(embedding_size=embedding_dim, output_dim=attention_dim)
+        self.encoder = Encoder(input_size=input_size,
+                               embedding_dim=embedding_dim,
+                               sequences=sequences,
+                               device=device).to(device)
+        self.attention = Attention(embedding_size=embedding_dim, output_dim=attention_dim).to(device)
         self.linear = nn.Sequential(
             nn.Conv1d(in_channels=input_size, out_channels=1, kernel_size=1),
             nn.ReLU()

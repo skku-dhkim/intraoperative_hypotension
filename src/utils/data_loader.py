@@ -4,7 +4,7 @@ import numpy as np
 import os
 import glob
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, Sampler
 
 
 def data_load(data_path, attr, maxcases):
@@ -57,14 +57,16 @@ def matching_caseID(data_path):
 class VitalDataset(Dataset):
     def __init__(self, x_tensor, y_tensor):
         super(Dataset, self).__init__()
-        self.x = np.array(x_tensor)
-        self.y = np.array(y_tensor, dtype=np.long)
+        self.x = x_tensor
+        self.y = y_tensor
 
     def __getitem__(self, index):
-        x = torch.FloatTensor(self.x[index])
-        y = self.y[index]
+        x = np.array(self.x[index], dtype=np.float32)
+        y = np.array(self.y[index], dtype=np.int64)
         return x, y
 
     def __len__(self):
         return len(self.x)
 
+    def get_labels(self):
+        return list(self.y)

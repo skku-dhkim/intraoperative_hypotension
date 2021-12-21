@@ -77,10 +77,13 @@ def train(data_loader,
                 running_loss = running_loss / step_count
                 # pbar.set_postfix({'Epochs': epoch, "loss": running_loss})
                 writer.add_scalar('Loss/train', running_loss, epoch*step_counter+step_counter)
+                if isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+                    lr_scheduler.step(running_loss)
                 running_loss = 0
 
         if lr_scheduler:
-            lr_scheduler.step()
+            if not isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+                lr_scheduler.step()
 
         accuracy = correct/len(data_loader.dataset) * 100
         pbar.write("Epoch[{}] - Accuracy: {:.2f}".format(epoch, accuracy))

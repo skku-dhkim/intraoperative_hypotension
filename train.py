@@ -10,7 +10,7 @@ from src.utils.data_loader import VitalDataset
 from src.utils.train_function import train, test
 from src.models.rnn import ValinaLSTM
 from src.models.cnn import OneDimCNN, MultiChannelCNN, AttentionCNN
-from torchsampler import ImbalancedDatasetSampler
+from src.utils.data_loader import ImbalancedDatasetSampler
 
 batch_size = 256
 input_size = 7
@@ -53,9 +53,9 @@ print("Test Data y shape: {}".format(test_y.shape))
 vital_dataset = VitalDataset(x_tensor=data_x, y_tensor=data_y)
 test_dataset = VitalDataset(x_tensor=test_x, y_tensor=test_y)
 
-train_loader = DataLoader(dataset=vital_dataset, batch_size=batch_size, shuffle=True,
-                          sampler=ImbalancedDatasetSampler(train_dataset))
-test_loader = DataLoader(dataset=test_dataset, batch_size=test_x.shape[1], shuffle=False,
+train_loader = DataLoader(dataset=vital_dataset, batch_size=batch_size, shuffle=False,
+                          sampler=ImbalancedDatasetSampler(vital_dataset))
+test_loader = DataLoader(dataset=test_dataset, batch_size=test_x.shape[0], shuffle=False,
                          sampler=ImbalancedDatasetSampler(test_dataset))
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -68,12 +68,15 @@ model = ValinaLSTM(input_size, hidden_units, layers, num_of_classes=3)
 #                      attention_dim=64,
 #                      sequences=sequences,
 #                      num_of_classes=3, device=device)
-
-
+#
+#
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=lr)
-# lr_sched = optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.1)
-lr_sched = None
+# optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9)
+
+lr_sched = optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.1)
+# lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+# lr_sched = None
 
 model = train(data_loader=test_loader,
               model=model,
@@ -86,7 +89,7 @@ model = train(data_loader=test_loader,
               hidden=True,
               lr_scheduler=lr_sched)
 
-score, accuracy = test(data_loader=test_loader, model=model, hidden=False)
+score, accuracy = test(data_loader=test_loader, model=model, hidden=True, device=device)
 print("AUC score: {}".format(score))
 
 

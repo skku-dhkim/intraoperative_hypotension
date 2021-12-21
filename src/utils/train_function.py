@@ -99,6 +99,7 @@ def train(data_loader,
 
 
 def test(data_loader, model, device, **kwargs):
+    print("Test function")
     if 'hidden' in kwargs.keys():
         hidden = kwargs['hidden']
     else:
@@ -110,7 +111,7 @@ def test(data_loader, model, device, **kwargs):
         total_len = 0
         for x, y in data_loader:
             x = x.to(device)
-            y = x.to(device)
+            y = y.to(device)
 
             if hidden:
                 hidden = model.init_hidden(x.shape[0], device)
@@ -120,7 +121,7 @@ def test(data_loader, model, device, **kwargs):
                 predicted = model(x)
                 _, predicted = torch.max(predicted.data, 1)
 
-            correct += (predicted == target_y).sum().item()
+            correct += (predicted == y).sum().item()
             total_len += len(y)
             accuracy = (correct/total_len) * 100
             print("Accuracy: {}".format(correct/total_len))

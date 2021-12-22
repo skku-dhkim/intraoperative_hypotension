@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import os
 import torch.optim as optim
+import torch.nn.functional as F
 
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -127,27 +128,29 @@ def test(data_loader, model, device, **kwargs):
             if hidden_flag:
                 hidden = model.init_hidden(x.shape[0], device)
                 predicted = model(x, hidden)
-                _, predicted = torch.max(predicted.data, 1)
+                predict_prob = torch.softmax(predicted, dim=1)
+                _, predicted_y = torch.max(predict_prob, 1)
             else:
                 predicted = model(x)
-                _, predicted = torch.max(predicted.data, 1)
+                predict_prob = torch.softmax(predicted, dim=1)
+                _, predicted_y = torch.max(predict_prob, 1)
 
-            correct = (predicted == y).sum().item()
+            correct = (predicted_y == y).sum().item()
             accuracy = (correct/len(y)) * 100
 
             total_correct += correct
             total_len += len(y)
 
-            score = 0
-            # score = roc_auc_score(y.detach().cpu().numpy(), predicted.detach().cpu().numpy(), multi_class='ovo')
-            fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.detach().cpu().numpy(), pos_label=0)
-            score += auc(fpr, tpr)
-            fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.detach().cpu().numpy(), pos_label=1)
-            score += auc(fpr, tpr)
-            fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.detach().cpu().numpy(), pos_label=2)
-            score += auc(fpr, tpr)
-
-            score = score/3
+            # score = 0
+            score = roc_auc_score(y.detach().cpu().tolist(), predict_prob.detach().cpu().tolist(), multi_class='ovr')
+            # fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.data.detach().cpu().numpy(), pos_label=0)
+            # score += auc(fpr, tpr)
+            # fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.data.detach().cpu().numpy(), pos_label=1)
+            # score += auc(fpr, tpr)
+            # fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.data.detach().cpu().numpy(), pos_label=2)
+            # score += auc(fpr, tpr)
+            #
+            # score = score/3
             total_score += score
 
             pbar.set_postfix({"Accuracy": accuracy, "AUROC Score": score})

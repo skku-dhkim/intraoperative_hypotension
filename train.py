@@ -105,7 +105,7 @@ if __name__ == "__main__":
     # NOTE: Optimizer settings
     if args.optimizer.lower() == 'adam':
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    elif args.optimizer.lower() == 'SGD':
+    elif args.optimizer.lower() == 'sgd':
         optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
     elif args.optimizer.lower() == 'rmsprop':
         optimizer = optim.RMSprop(model.parameters(), lr=args.lr)

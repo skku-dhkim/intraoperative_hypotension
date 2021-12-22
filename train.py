@@ -60,7 +60,8 @@ if __name__ == "__main__":
 
     train_loader = DataLoader(dataset=vital_dataset, batch_size=args.train_batch,
                               sampler=ImbalancedDatasetSampler(vital_dataset))
-    test_loader = DataLoader(dataset=test_dataset, batch_size=args.test_batch, shuffle=False)
+    test_loader = DataLoader(dataset=test_dataset, batch_size=args.test_batch,
+                             sampler=ImbalancedDatasetSampler(test_dataset))
 
     # NOTE: Device Setting
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

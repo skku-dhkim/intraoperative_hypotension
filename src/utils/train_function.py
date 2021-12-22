@@ -22,7 +22,6 @@ def train(data_loader,
 
     # TODO: Tensorboard need to be fixed.
     writer = SummaryWriter(log_dir=summary_path)
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
 
     best_score = 0
@@ -142,7 +141,7 @@ def test(data_loader, model, device, **kwargs):
             total_len += len(y)
 
             # score = 0
-            score = roc_auc_score(y.detach().cpu().tolist(), predict_prob.detach().cpu().tolist(), multi_class='ovr', average='micro')
+            score = roc_auc_score(y.detach().cpu().tolist(), predict_prob.detach().cpu().tolist(), multi_class='ovr')
             # fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.data.detach().cpu().numpy(), pos_label=0)
             # score += auc(fpr, tpr)
             # fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.data.detach().cpu().numpy(), pos_label=1)

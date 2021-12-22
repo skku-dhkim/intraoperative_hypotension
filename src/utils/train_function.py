@@ -108,14 +108,15 @@ def test(data_loader, model, device, **kwargs):
     else:
         hidden = False
 
-    list_predict = []
-    list_y = []
     pbar = tqdm(data_loader, desc="Test steps")
 
     model.to(device)
     with torch.no_grad():
         correct = 0
         total_len = 0
+        total_score = 0
+        batch_len = len(pbar)
+
         for x, y in pbar:
             x = x.to(device)
             y = y.to(device)
@@ -131,28 +132,22 @@ def test(data_loader, model, device, **kwargs):
             correct += (predicted == y).sum().item()
             total_len += len(y)
             accuracy = (correct/total_len) * 100
-            # print("Accuracy: {}".format(correct/total_len))
-            pbar.set_postfix({"Accuracy": accuracy})
 
-            list_predict.append(predicted.detach().numpy())
-            list_y.append(y.detach().numpy())
+            score = 0
+            fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.detach().cpu().numpy(), pos_label=0)
+            score += auc(fpr, tpr)
+            fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.detach().cpu().numpy(), pos_label=1)
+            score += auc(fpr, tpr)
+            fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.detach().cpu().numpy(), pos_label=2)
+            score += auc(fpr, tpr)
 
-    np_predict = np.array(list_predict)
-    np_y = np.array(list_y)
+            score = score/3
+            total_score += score
 
-    np_predict = np_predict.flatten()
-    np_y = np_y.flatten()
+            pbar.set_postfix({"Accuracy": accuracy, "Score": score})
 
-    score = 0
-    fpr, tpr, thresholds = roc_curve(np_y, np_predict, pos_label=0)
-    score += auc(fpr, tpr)
-    fpr, tpr, thresholds = roc_curve(np_y, np_predict, pos_label=1)
-    score += auc(fpr, tpr)
-    fpr, tpr, thresholds = roc_curve(np_y, np_predict, pos_label=2)
-    score += auc(fpr, tpr)
+    total_score = total_score/batch_len
 
-    score = score/3
-
-    pbar.write("AUC score[{}] / Accuracy: {:.2f}".format(score, accuracy))
+    pbar.write("AUC score[{}] / Accuracy: {:.2f}".format(total_score, accuracy))
 
     return score, accuracy

@@ -19,8 +19,8 @@ layers = 1
 hidden = True
 step_count = 1000
 
-model_name = 'Attention-CNN'
-log_path = './logs/Test'
+model_name = 'LSTM_v3'
+log_path = './logs/{}'.format(model_name)
 
 f2 = h5py.File('./data/dataset/test_2021-12-17-17:52.hdf5', 'r')
 
@@ -30,7 +30,7 @@ print("Test Data x shape: {}".format(test_x.shape))
 print("Test Data y shape: {}".format(test_y.shape))
 
 test_dataset = VitalDataset(x_tensor=test_x, y_tensor=test_y)
-test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False,
+test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size,
                          sampler=ImbalancedDatasetSampler(test_dataset))
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -44,7 +44,7 @@ model = ValinaLSTM(input_size, hidden_units, layers, num_of_classes=3)
 #                      sequences=sequences,
 #                      num_of_classes=3, device=device)
 
-model.load_state_dict(torch.load('{}/best_model-9.pt'.format(log_path), map_location=device))
+model.load_state_dict(torch.load('{}/checkpoint/best_model-9.pt'.format(log_path), map_location=device))
 score, accuracy = test(data_loader=test_loader, model=model, hidden=hidden, device=device)
 
 

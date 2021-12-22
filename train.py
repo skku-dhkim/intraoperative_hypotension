@@ -14,15 +14,15 @@ from src.utils.data_loader import ImbalancedDatasetSampler
 
 batch_size = 256
 input_size = 7
-hidden_units = 128
+hidden_units = 256
 layers = 1
-epochs = 10
+epochs = 15
 lr = 0.001
 hidden = True
 
 step_count = 1000
 
-model_name = 'Attention-CNN'
+model_name = 'LSTM_'
 log_path = './logs/{}'.format(model_name)
 
 f = h5py.File('./data/dataset/test_2021-12-17-17:52.hdf5', 'r')
@@ -77,9 +77,10 @@ optimizer = optim.Adam(model.parameters(), lr=lr)
 
 # lr_sched = optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.1)
 # lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
-# lr_sched = None
+lr_sched = None
 
 model, best_score, test_acc = train(data_loader=train_loader,
+                                    test_loader=test_loader,
                                     model=model,
                                     epochs=epochs,
                                     optimizer=optimizer,

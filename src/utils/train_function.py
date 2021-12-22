@@ -1,9 +1,11 @@
 import numpy as np
 import torch
+import os
+import torch.optim as optim
+
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from sklearn.metrics import roc_curve, auc
-import os
 
 
 def train(data_loader,
@@ -148,6 +150,6 @@ def test(data_loader, model, device, **kwargs):
 
     total_score = total_score/batch_len
 
-    pbar.write("AUC score[{}] / Accuracy: {:.2f}".format(total_score, accuracy))
+    pbar.write("AUC score[{:.2f}] / Accuracy: {:.2f}".format(total_score, accuracy))
 
     return score, accuracy

@@ -142,7 +142,7 @@ def test(data_loader, model, device, **kwargs):
             total_len += len(y)
 
             # score = 0
-            score = roc_auc_score(y.detach().cpu().tolist(), predict_prob.detach().cpu().tolist(), multi_class='ovr')
+            score = roc_auc_score(y.detach().cpu().tolist(), predict_prob.detach().cpu().tolist(), multi_class='ovr', average='micro')
             # fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.data.detach().cpu().numpy(), pos_label=0)
             # score += auc(fpr, tpr)
             # fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.data.detach().cpu().numpy(), pos_label=1)

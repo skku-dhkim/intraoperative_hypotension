@@ -7,6 +7,7 @@ import os
 
 
 def train(data_loader,
+          test_loader,
           model,
           epochs,
           optimizer,
@@ -20,7 +21,8 @@ def train(data_loader,
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
 
-    best_acc = 0
+    best_score = 0
+    test_acc = 0
 
     if 'step_count' in kwargs.keys():
         step_count = kwargs['step_count']
@@ -47,9 +49,6 @@ def train(data_loader,
         for x, y in pbar:
             input_x = x.to(device)
             target_y = y.to(device)
-
-            # if input_x.isnan().any():
-            #     continue
 
             if hidden:
                 hidden = model.init_hidden(input_x.shape[0], device)
@@ -91,28 +90,33 @@ def train(data_loader,
 
         writer.add_scalar('Accuracy/train', accuracy, epoch)
 
-        if accuracy > best_acc:
+        score, test_acc = test(test_loader, model, device=device)
+
+        if score > best_score:
             if not os.path.exists(model_path):
                 os.makedirs(model_path)
             torch.save(model.state_dict(), model_path+'/best_model-{}.pt'.format(epoch))
-            best_acc = accuracy
+            best_score = score
 
     writer.close()
-    return model
+    return model, best_score, test_acc
 
 
 def test(data_loader, model, device, **kwargs):
-    print("Test function")
     if 'hidden' in kwargs.keys():
         hidden = kwargs['hidden']
     else:
         hidden = False
 
+    list_predict = []
+    list_y = []
+    pbar = tqdm(data_loader, desc="Test steps")
+
     model.to(device)
     with torch.no_grad():
         correct = 0
         total_len = 0
-        for x, y in data_loader:
+        for x, y in pbar:
             x = x.to(device)
             y = y.to(device)
 
@@ -127,15 +131,28 @@ def test(data_loader, model, device, **kwargs):
             correct += (predicted == y).sum().item()
             total_len += len(y)
             accuracy = (correct/total_len) * 100
-            print("Accuracy: {}".format(correct/total_len))
+            # print("Accuracy: {}".format(correct/total_len))
+            pbar.set_postfix({"Accuracy": accuracy})
 
-            score = 0
-            fpr, tpr, thresholds = roc_curve(y, predicted, pos_label=0)
-            score += auc(fpr, tpr)
-            fpr, tpr, thresholds = roc_curve(y, predicted, pos_label=1)
-            score += auc(fpr, tpr)
-            fpr, tpr, thresholds = roc_curve(y, predicted, pos_label=2)
-            score += auc(fpr, tpr)
+            list_predict.append(predicted.detach().numpy())
+            list_y.append(y.detach().numpy())
 
-            score = score/3
+    np_predict = np.array(list_predict)
+    np_y = np.array(list_y)
+
+    np_predict = np_predict.flatten()
+    np_y = np_y.flatten()
+
+    score = 0
+    fpr, tpr, thresholds = roc_curve(np_y, np_predict, pos_label=0)
+    score += auc(fpr, tpr)
+    fpr, tpr, thresholds = roc_curve(np_y, np_predict, pos_label=1)
+    score += auc(fpr, tpr)
+    fpr, tpr, thresholds = roc_curve(np_y, np_predict, pos_label=2)
+    score += auc(fpr, tpr)
+
+    score = score/3
+
+    pbar.write("AUC score[{}] / Accuracy: {:.2f}".format(score, accuracy))
+
     return score, accuracy

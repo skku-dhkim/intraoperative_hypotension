@@ -18,11 +18,12 @@ hidden_units = 128
 layers = 1
 epochs = 10
 lr = 0.001
+hidden = True
 
 step_count = 1000
 
 model_name = 'Attention-CNN'
-log_path = './logs/Attention-CNN'
+log_path = './logs/{}'.format(model_name)
 
 f = h5py.File('./data/dataset/test_2021-12-17-17:52.hdf5', 'r')
 
@@ -53,9 +54,9 @@ print("Test Data y shape: {}".format(test_y.shape))
 vital_dataset = VitalDataset(x_tensor=data_x, y_tensor=data_y)
 test_dataset = VitalDataset(x_tensor=test_x, y_tensor=test_y)
 
-train_loader = DataLoader(dataset=vital_dataset, batch_size=batch_size, shuffle=False,
+train_loader = DataLoader(dataset=vital_dataset, batch_size=batch_size,
                           sampler=ImbalancedDatasetSampler(vital_dataset))
-test_loader = DataLoader(dataset=test_dataset, batch_size=test_x.shape[0], shuffle=False,
+test_loader = DataLoader(dataset=test_dataset, batch_size=1024,
                          sampler=ImbalancedDatasetSampler(test_dataset))
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -74,23 +75,20 @@ criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 # optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9)
 
-lr_sched = optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.1)
+# lr_sched = optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.1)
 # lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
 # lr_sched = None
 
-model = train(data_loader=test_loader,
-              model=model,
-              epochs=epochs,
-              optimizer=optimizer,
-              loss_fn=criterion,
-              summary_path=log_path,
-              step_count=step_count,
-              model_path=log_path+"/checkpoint/",
-              hidden=True,
-              lr_scheduler=lr_sched)
-
-score, accuracy = test(data_loader=test_loader, model=model, hidden=True, device=device)
-print("AUC score: {}".format(score))
+model, best_score, test_acc = train(data_loader=train_loader,
+                                    model=model,
+                                    epochs=epochs,
+                                    optimizer=optimizer,
+                                    loss_fn=criterion,
+                                    summary_path=log_path,
+                                    step_count=step_count,
+                                    model_path=log_path + "/checkpoint/",
+                                    hidden=hidden,
+                                    lr_scheduler=lr_sched)
 
 
 with open("{}/{}_train_result.txt".format(log_path, model_name), "w") as file:
@@ -100,6 +98,5 @@ with open("{}/{}_train_result.txt".format(log_path, model_name), "w") as file:
     file.write("Layers: {}\n".format(layers))
     file.write("Epochs: {}\n".format(epochs))
     file.write("Learning rate: {}\n".format(lr))
-    file.write("Accuracy: {}\n".format(accuracy))
-    file.write("AUC Score: {}\n".format(score))
-
+    file.write("Accuracy: {}\n".format(test_acc))
+    file.write("AUC Score: {}\n".format(best_score))

@@ -22,7 +22,7 @@ step_count = 1000
 model_name = 'LSTM_v3'
 log_path = './logs/{}'.format(model_name)
 
-f2 = h5py.File('./data/dataset/test_2021-12-17-17:52.hdf5', 'r')
+f2 = h5py.File('./data/dataset/test_2021-12-21-12:22.hdf5', 'r')
 
 test_x = f2['test']['x']
 test_y = f2['test']['y']

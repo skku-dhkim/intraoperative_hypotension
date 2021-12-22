@@ -5,7 +5,7 @@ import torch.optim as optim
 
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_curve, auc, roc_auc_score
 
 
 def train(data_loader,
@@ -16,11 +16,12 @@ def train(data_loader,
           loss_fn,
           summary_path,
           model_path,
+          device,
           **kwargs):
 
     # TODO: Tensorboard need to be fixed.
     writer = SummaryWriter(log_dir=summary_path)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
 
     best_score = 0
@@ -86,13 +87,7 @@ def train(data_loader,
             if not isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
                 lr_scheduler.step()
 
-        accuracy = correct/len(data_loader.dataset) * 100
-        pbar.write("Epoch[{}] - Accuracy: {:.2f}".format(epoch, accuracy))
-        pbar.close()
-
-        writer.add_scalar('Accuracy/train', accuracy, epoch)
-
-        score, test_acc = test(test_loader, model, device=device)
+        score, test_acc = test(test_loader, model, device=device, hidden=hidden)
 
         if score > best_score:
             if not os.path.exists(model_path):
@@ -100,6 +95,12 @@ def train(data_loader,
             torch.save(model.state_dict(), model_path+'/best_model-{}.pt'.format(epoch))
             best_score = score
 
+        accuracy = correct/len(data_loader.dataset) * 100
+        pbar.write("Epoch[{}] - Accuracy: {:.2f}".format(epoch, accuracy))
+        pbar.write("Test_acc[{:.2f}] - Score:[{:.2f}]".format(test_acc, score))
+        pbar.close()
+
+        writer.add_scalar('Accuracy/train', accuracy, epoch)
     writer.close()
     return model, best_score, test_acc
 
@@ -114,7 +115,8 @@ def test(data_loader, model, device, **kwargs):
 
     model.to(device)
     with torch.no_grad():
-        correct = 0
+        total_correct = 0
+
         total_len = 0
         total_score = 0
         batch_len = len(pbar)
@@ -131,25 +133,29 @@ def test(data_loader, model, device, **kwargs):
                 predicted = model(x)
                 _, predicted = torch.max(predicted.data, 1)
 
-            correct += (predicted == y).sum().item()
+            correct = (predicted == y).sum().item()
+            accuracy = (correct/len(y)) * 100
+
+            total_correct += correct
             total_len += len(y)
-            accuracy = (correct/total_len) * 100
 
-            score = 0
-            fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.detach().cpu().numpy(), pos_label=0)
-            score += auc(fpr, tpr)
-            fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.detach().cpu().numpy(), pos_label=1)
-            score += auc(fpr, tpr)
-            fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.detach().cpu().numpy(), pos_label=2)
-            score += auc(fpr, tpr)
+            # score = 0
+            score = roc_auc_score(y.detach().cpu().numpy(), predicted.detach().cpu().numpy(), multi_class='ovo')
+            # fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.detach().cpu().numpy(), pos_label=0)
+            # score += auc(fpr, tpr)
+            # fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.detach().cpu().numpy(), pos_label=1)
+            # score += auc(fpr, tpr)
+            # fpr, tpr, thresholds = roc_curve(y.detach().cpu().numpy(), predicted.detach().cpu().numpy(), pos_label=2)
+            # score += auc(fpr, tpr)
 
-            score = score/3
+            # score = score/3
             total_score += score
 
-            pbar.set_postfix({"Accuracy": accuracy, "Score": score})
+            pbar.set_postfix({"Accuracy": accuracy, "AUROC Score": score})
 
     total_score = total_score/batch_len
+    total_accuracy = (total_correct/total_len)*100
 
-    pbar.write("AUC score[{:.2f}] / Accuracy: {:.2f}".format(total_score, accuracy))
+    pbar.write("AUC score[{:.2f}] / Accuracy: {:.2f}".format(total_score, total_accuracy))
 
-    return score, accuracy
+    return total_score, total_accuracy

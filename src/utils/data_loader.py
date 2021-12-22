@@ -73,18 +73,18 @@ class VitalDataset(Dataset):
         return list(self.y)
 
 
-class CustomWeightedRandomSampler(WeightedRandomSampler):
-    """WeightedRandomSampler except allows for more than 2^24 samples to be sampled"""
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def __iter__(self):
-        rand_tensor = np.random.choice(range(0, len(self.weights)),
-                                       size=self.num_samples,
-                                       p=self.weights.numpy() / torch.sum(self.weights).numpy(),
-                                       replace=self.replacement)
-        rand_tensor = torch.from_numpy(rand_tensor)
-        return iter(rand_tensor.tolist())
+# class CustomWeightedRandomSampler(WeightedRandomSampler):
+#     """WeightedRandomSampler except allows for more than 2^24 samples to be sampled"""
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+#
+#     def __iter__(self):
+#         rand_tensor = np.random.choice(range(0, len(self.weights)),
+#                                        size=self.num_samples,
+#                                        p=self.weights.numpy() / torch.sum(self.weights).numpy(),
+#                                        replace=self.replacement)
+#         rand_tensor = torch.from_numpy(rand_tensor)
+#         return iter(rand_tensor.tolist())
 
 
 class ImbalancedDatasetSampler(Sampler):
@@ -137,3 +137,12 @@ class ImbalancedDatasetSampler(Sampler):
 
     def __len__(self):
         return self.num_samples
+
+
+def load_from_hdf5(file_path):
+    f = h5py.File(file_path, 'r')
+
+    data_x = f['train']['x']
+    data_y = f['train']['y']
+
+    return data_x, data_y

@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import copy
 import math
 from torch import nn, ones
-
+from src.models.attentions import MultiHeadAttention
 
 class OneDimCNN(nn.Module):
     def __init__(self, input_size: int, num_of_classes: int):
@@ -175,3 +175,44 @@ class AttentionCNN(nn.Module):
         out = nn.Flatten()(out)
         out = self.FC(out)
         return out
+
+
+class MultiHeadAttentionCNN(nn.Module):
+    def __init__(self,
+                 input_size: int,
+                 embedding_dim: int,
+                 attention_dim: int,
+                 num_heads: int,
+                 sequences: int,
+                 num_of_classes: int,
+                 device):
+        super(MultiHeadAttentionCNN, self).__init__()
+        self.embedding_dim = embedding_dim
+        self.encoder = Encoder(input_size=input_size,
+                               embedding_dim=embedding_dim,
+                               sequences=sequences,
+                               device=device).to(device)
+        self.multi_head_attn = MultiHeadAttention(d_model=embedding_dim, num_heads=num_heads)
+        self.rnn = nn.RNN(input_size=embedding_dim, hidden_size=embedding_dim)
+        self.linear = nn.Sequential(
+            nn.Linear(embedding_dim, int(embedding_dim/2)),
+            # nn.Dropout(0.5),
+            nn.ReLU()
+        )
+        self.fc = nn.Linear(int(embedding_dim/2), num_of_classes)
+
+    def forward(self, x, hidden):
+        out = self.encoder(x)
+        context, attn = self.multi_head_attn(key=out,
+                                             query=out,
+                                             value=out)
+        context = context.transpose(0, 1)
+        out, _ = self.rnn(context, hidden)
+        out = out[-1]
+        out = self.linear(out)
+        out = self.fc(out)
+        return out
+
+    def init_hidden(self, batch_size, device):
+        hidden = torch.ones(1, batch_size, self.embedding_dim, device=device)
+        return hidden

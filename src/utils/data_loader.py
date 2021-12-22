@@ -4,6 +4,7 @@ import numpy as np
 import os
 import glob
 import torch
+import h5py
 from torch.utils.data import DataLoader, Dataset, Sampler, WeightedRandomSampler
 from typing import Callable
 
@@ -139,10 +140,10 @@ class ImbalancedDatasetSampler(Sampler):
         return self.num_samples
 
 
-def load_from_hdf5(file_path):
+def load_from_hdf5(file_path, dtype):
     f = h5py.File(file_path, 'r')
 
-    data_x = f['train']['x']
-    data_y = f['train']['y']
+    data_x = f[dtype]['x']
+    data_y = f[dtype]['y']
 
     return data_x, data_y

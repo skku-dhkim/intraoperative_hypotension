@@ -33,9 +33,9 @@ def train(data_loader,
         step_count = 1000
 
     if 'hidden' in kwargs.keys():
-        hidden = kwargs['hidden']
+        hidden_flag = kwargs['hidden']
     else:
-        hidden = False
+        hidden_flag = False
 
     if 'lr_scheduler' in kwargs.keys():
         lr_scheduler = kwargs['lr_scheduler']
@@ -53,9 +53,9 @@ def train(data_loader,
             input_x = x.to(device)
             target_y = y.to(device)
 
-            if hidden:
+            if hidden_flag:
                 hidden = model.init_hidden(input_x.shape[0], device)
-                predicted = model(hidden, input_x)
+                predicted = model(input_x, hidden)
             else:
                 predicted = model(input_x)
 
@@ -77,7 +77,6 @@ def train(data_loader,
 
             if step_counter % step_count == 0:
                 running_loss = running_loss / step_count
-                # pbar.set_postfix({'Epochs': epoch, "loss": running_loss})
                 writer.add_scalar('Loss/train', running_loss, epoch*step_counter+step_counter)
                 if isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
                     lr_scheduler.step(running_loss)
@@ -87,7 +86,7 @@ def train(data_loader,
             if not isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
                 lr_scheduler.step()
 
-        score, test_acc = test(test_loader, model, device=device, hidden=hidden)
+        score, test_acc = test(test_loader, model, device=device, hidden=hidden_flag)
 
         if score > best_score:
             if not os.path.exists(model_path):
@@ -107,9 +106,9 @@ def train(data_loader,
 
 def test(data_loader, model, device, **kwargs):
     if 'hidden' in kwargs.keys():
-        hidden = kwargs['hidden']
+        hidden_flag = kwargs['hidden']
     else:
-        hidden = False
+        hidden_flag = False
 
     pbar = tqdm(data_loader, desc="Test steps")
 
@@ -125,9 +124,9 @@ def test(data_loader, model, device, **kwargs):
             x = x.to(device)
             y = y.to(device)
 
-            if hidden:
+            if hidden_flag:
                 hidden = model.init_hidden(x.shape[0], device)
-                predicted = model(hidden, x)
+                predicted = model(x, hidden)
                 _, predicted = torch.max(predicted.data, 1)
             else:
                 predicted = model(x)

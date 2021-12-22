@@ -55,8 +55,8 @@ if __name__ == "__main__":
     print("Test Data y shape: {}".format(test_y.shape))
 
     # NOTE: Data setting
-    vital_dataset = VitalDataset(x_tensor=train_x[:10000], y_tensor=train_y[:10000])
-    test_dataset = VitalDataset(x_tensor=test_x[:10000], y_tensor=test_y[:10000])
+    vital_dataset = VitalDataset(x_tensor=train_x, y_tensor=train_y)
+    test_dataset = VitalDataset(x_tensor=test_x, y_tensor=test_y)
 
     train_loader = DataLoader(dataset=vital_dataset, batch_size=args.train_batch,
                               sampler=ImbalancedDatasetSampler(vital_dataset))

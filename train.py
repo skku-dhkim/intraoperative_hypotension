@@ -71,7 +71,7 @@ if __name__ == "__main__":
     # NOTE: Model Setting
     if args.model.lower() == "lstm":
         hidden = True
-        model = ValinaLSTM(input_size, hidden_units, layers, num_of_classes=3)
+        model = ValinaLSTM(input_size, args.hidden_dim, args.layers, num_of_classes=3)
     elif args.model.lower() == 'cnn':
         hidden = False
         model = OneDimCNN(input_size, num_of_classes=3)

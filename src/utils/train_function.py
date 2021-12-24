@@ -88,14 +88,23 @@ def train(data_loader,
 
         score, test_acc = test(test_loader, model, device=device, hidden=hidden_flag)
 
+        if not os.path.exists(model_path):
+            os.makedirs(model_path)
+
         if score > best_score:
-            if not os.path.exists(model_path):
-                os.makedirs(model_path)
-            torch.save(model.state_dict(), model_path+'/best_model-{}.pt'.format(epoch))
-            best_score = score
+            torch.save({
+                'epoch': epoch,
+                'state_dict': model.state_dict(),
+                'optimizer': optimizer.state_dict()
+            }, model_path+'/best-model-{}.pt'.format(epoch))
+        else:
+            torch.save({
+                'epoch': epoch,
+                'state_dict': model.state_dict()
+            }, model_path + '/model-{}.pt'.format(epoch))
 
         accuracy = correct/len(data_loader.dataset) * 100
-        pbar.write("Epoch[{}] - Accuracy: {:.2f}".format(epoch, accuracy))
+        pbar.write("Epoch[{}] - Train Accuracy: {:.2f}".format(epoch, accuracy))
         pbar.write("Test_acc[{:.2f}] - Score:[{:.2f}]".format(test_acc, score))
         pbar.close()
 

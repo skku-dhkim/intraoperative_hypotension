@@ -5,17 +5,18 @@ import math
 from torch import nn, ones
 from src.models.attentions import MultiHeadAttention
 
+
 class OneDimCNN(nn.Module):
-    def __init__(self, input_size: int, num_of_classes: int):
+    def __init__(self, input_size: int, hidden_dim: int, num_of_classes: int):
         super(OneDimCNN, self).__init__()
         init_channel = 32
         self.conv1 = nn.Sequential(
-            nn.Conv1d(input_size, init_channel, kernel_size=3),
+            nn.Conv1d(input_size, hidden_dim, kernel_size=3),
             nn.ReLU(),
             nn.MaxPool1d(kernel_size=2)
         )
         self.conv2 = nn.Sequential(
-            nn.Conv1d(init_channel, init_channel*2, kernel_size=3),
+            nn.Conv1d(init_channel, hidden_dim, kernel_size=3),
             nn.ReLU(),
             nn.MaxPool1d(kernel_size=2)
         )
@@ -130,12 +131,14 @@ class Encoder(nn.Module):
     def __init__(self, input_size: int, embedding_dim: int, sequences: int, device):
         super(Encoder, self).__init__()
         self.layers = []
-        self.linear = nn.Sequential(
-            nn.Linear(in_features=sequences, out_features=embedding_dim),
-            nn.ReLU()
-        )
-        for _ in range(input_size):
-            self.layers.append(copy.deepcopy(self.linear).to(device))
+
+        def create_linear(in_c, out_c):
+            linear = nn.Sequential(
+                nn.Linear(in_features=in_c, out_features=out_c),
+                nn.ReLU()
+            )
+            return linear
+        self.layers = nn.ModuleList([create_linear(sequences, embedding_dim) for _ in range(input_size)])
 
     def forward(self, x):
         x = x.transpose(1, 2)

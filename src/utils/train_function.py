@@ -21,7 +21,7 @@ def train(data_loader,
           **kwargs):
 
     # TODO: Tensorboard need to be fixed.
-    writer = SummaryWriter(log_dir=summary_path)
+    writer = SummaryWriter(log_dir=summary_path+"/runs")
     model = model.to(device)
 
     best_score = 0
@@ -108,7 +108,8 @@ def train(data_loader,
         pbar.write("Test_acc[{:.2f}] - Score:[{:.2f}]".format(test_acc, score))
         pbar.close()
 
-        writer.add_scalar('Accuracy/train', accuracy, epoch)
+        writer.add_scalar('Score', score)
+        writer.add_scalar('Accuracy', accuracy, epoch)
     writer.close()
     return model, best_score, test_acc
 

@@ -12,7 +12,7 @@ class ValinaLSTM(nn.Module):
         self.linear = nn.Linear(hidden_size, 128)
         self.fc = nn.Linear(128, num_of_classes)
 
-    def forward(self, hidden, X):
+    def forward(self, X, hidden):
         X = X.transpose(0, 1)
         outputs, hidden = self.lstm(X, hidden)
         outputs = outputs[-1]

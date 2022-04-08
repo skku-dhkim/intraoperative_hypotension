@@ -7,12 +7,13 @@ import argparse
 import random
 
 from tqdm import tqdm
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, RandomSampler
 from src.utils.data_loader import VitalDataset, load_from_hdf5
 from src.utils.train_function import train, test
 from src.models.rnn import ValinaLSTM
 from src.models.cnn import OneDimCNN, MultiChannelCNN, AttentionCNN, MultiHeadAttentionCNN
 from src.utils.data_loader import ImbalancedDatasetSampler
+from src.utils.loss_F import FocalLoss, WeightedFocalLoss
 
 
 if __name__ == "__main__":
@@ -60,8 +61,12 @@ if __name__ == "__main__":
 
     train_loader = DataLoader(dataset=vital_dataset, batch_size=args.train_batch,
                               sampler=ImbalancedDatasetSampler(vital_dataset))
+    # train_loader = DataLoader(dataset=vital_dataset, batch_size=args.train_batch,
+    #                           sampler=RandomSampler(vital_dataset))
     test_loader = DataLoader(dataset=test_dataset, batch_size=args.test_batch,
                              sampler=ImbalancedDatasetSampler(test_dataset))
+    # test_loader = DataLoader(dataset=test_dataset, batch_size=args.test_batch,
+    #                          sampler=RandomSampler(test_dataset))
 
     # NOTE: Device Setting
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -71,20 +76,20 @@ if __name__ == "__main__":
     # NOTE: Model Setting
     if args.model.lower() == "lstm":
         hidden = True
-        model = ValinaLSTM(input_size, args.hidden_dim, args.layers, num_of_classes=3)
+        model = ValinaLSTM(input_size, args.hidden_dim, args.layers, num_of_classes=2)
     elif args.model.lower() == 'cnn':
         hidden = False
-        model = OneDimCNN(input_size, num_of_classes=3)
+        model = OneDimCNN(input_size, num_of_classes=2)
     elif args.model.lower() == 'multi-channel-cnn':
         hidden = False
-        model = MultiChannelCNN(input_size=input_size, num_of_classes=3)
+        model = MultiChannelCNN(input_size=input_size, num_of_classes=2)
     elif args.model.lower() == 'attention_cnn':
         hidden = False
         model = AttentionCNN(input_size=input_size,
                              embedding_dim=args.hidden_dim,
                              attention_dim=args.attention_dim,
                              sequences=train_x.shape[1],
-                             num_of_classes=3, device=device)
+                             num_of_classes=2, device=device)
     elif args.model.lower() == 'multi_head_attn':
         hidden = True
         model = MultiHeadAttentionCNN(
@@ -93,7 +98,7 @@ if __name__ == "__main__":
             attention_dim=args.attention_dim,
             num_heads=args.num_headers,
             sequences=train_x.shape[1],
-            num_of_classes=3,
+            num_of_classes=2,
             device=device
         )
     else:
@@ -101,6 +106,7 @@ if __name__ == "__main__":
 
     # NOTE: Loss
     criterion = nn.CrossEntropyLoss()
+    # criterion = WeightedFocalLoss()
 
     # NOTE: Optimizer settings
     if args.optimizer.lower() == 'adam':

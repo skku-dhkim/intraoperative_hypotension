@@ -150,7 +150,7 @@ def test(data_loader, model, device, **kwargs):
             total_correct += correct
             total_len += len(y)
 
-            score = roc_auc_score(y.detach().cpu().tolist(), predict_prob.detach().cpu().tolist(), multi_class='ovr')
+            score = roc_auc_score(y.detach().cpu().tolist(), predicted_y.detach().cpu().tolist())
             total_score += score
 
             pbar.set_postfix({"Accuracy": accuracy, "AUROC Score": score})

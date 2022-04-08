@@ -50,14 +50,14 @@ if __name__ == "__main__":
         test_loader = DataLoader(dataset=test_dataset, batch_size=args.test_batch)
 
     # NOTE: Device Setting
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
 
     input_size = test_x.shape[-1]
 
     # NOTE: Model Setting
     if args.model.lower() == "lstm":
         hidden = True
-        model = ValinaLSTM(input_size, hidden_units, layers, num_of_classes=3)
+        model = ValinaLSTM(input_size, args.hidden_dim, args.layers, num_of_classes=3)
     elif args.model.lower() == 'cnn':
         hidden = False
         model = OneDimCNN(input_size, num_of_classes=3)
@@ -86,6 +86,7 @@ if __name__ == "__main__":
         raise NotImplementedError()
 
     weights = torch.load(args.weight_path, map_location=device)
+    model.load_state_dict(weights['state_dict'])
     score, accuracy = test(data_loader=test_loader, model=model, hidden=hidden, device=device)
     print(score, accuracy)
 

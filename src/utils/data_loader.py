@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader, Dataset, Sampler, WeightedRandomSampler
 from typing import Callable
 
 
-def data_load(data_path, attr, maxcases):
+def data_load(data_path, attr, maxcases, interval):
     if not os.path.isdir(data_path):
         os.mkdir(data_path)
 
@@ -17,7 +17,7 @@ def data_load(data_path, attr, maxcases):
     _ = vitaldb.load_cases(
         tnames=_attributes,
         path_for_save="{}/original".format(data_path),
-        interval=1,
+        interval=interval,
         maxcases=maxcases
     )
 
@@ -72,20 +72,6 @@ class VitalDataset(Dataset):
 
     def get_labels(self):
         return list(self.y)
-
-
-# class CustomWeightedRandomSampler(WeightedRandomSampler):
-#     """WeightedRandomSampler except allows for more than 2^24 samples to be sampled"""
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#
-#     def __iter__(self):
-#         rand_tensor = np.random.choice(range(0, len(self.weights)),
-#                                        size=self.num_samples,
-#                                        p=self.weights.numpy() / torch.sum(self.weights).numpy(),
-#                                        replace=self.replacement)
-#         rand_tensor = torch.from_numpy(rand_tensor)
-#         return iter(rand_tensor.tolist())
 
 
 class ImbalancedDatasetSampler(Sampler):

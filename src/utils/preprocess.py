@@ -36,22 +36,26 @@ def make_dataset(data_path: str, time_seq: int, time_step: int, target_seq: int,
     :return: None
     """
     file_list = glob.glob(os.path.join(data_path, "original/*.csv"))
-    num_of_process = os.cpu_count()
     processes = []
-
     pbar = tqdm(file_list, desc='Data preprocessing')
 
     while file_list:
         file = file_list.pop()
         pbar.update(1)
-        p = Process(target=job, args=(file, time_seq, time_step, target_seq, dst_path, ))
+        p = Process(target=job, args=(file, time_seq, time_step, target_seq, dst_path,))
         p.start()
         processes.append(p)
 
-        if len(processes) >= num_of_process:
+        if len(processes) >= cpu_counts:
             while processes:
                 _p = processes.pop()
                 _p.join()
+
+    # If process still left, flush...
+    if processes:
+        while processes:
+            _p = processes.pop()
+            _p.join()
 
 
 def data_split(
@@ -84,12 +88,12 @@ def data_split(
     pd_y = pd_y.replace({'normal': 0, 'low': 1, pd.NA: -1})
 
     # INFO: To numpy
-    np_x = pd_x.to_numpy()
-    np_y = pd_y.to_numpy()
+    np_x = pd_x.to_numpy(dtype=np.float16)
+    np_y = pd_y.to_numpy(dtype=np.int64)
 
-    for i in range(0, len(np_x)-total_seq, time_delay):
-        _x = np_x[i:i+time_seq]
-        _y = np_y[i+time_seq+target_seq]
+    for i in range(0, len(np_x) - total_seq, time_delay):
+        _x = np_x[i:i + time_seq]
+        _y = np_y[i + time_seq + target_seq]
 
         ############################################################################
         # INFO: Exception mechanism. You may add HERE if another exception needed.
@@ -141,8 +145,8 @@ def normalization(data_frame: DataFrame, file_save: bool, scaler=None, dataset_p
     df = pd.concat((df, data_frame[data_frame.columns[-1]]), axis=1)
 
     if file_save:
-        if os.path.exists(dataset_path+'/sets'):
-            os.makedirs(dataset_path+'/sets')
+        if os.path.exists(dataset_path + '/sets'):
+            os.makedirs(dataset_path + '/sets')
         with open(dataset_path + "/sets/scaler.pkl", "wb") as file:
             pickle.dump(scaler, file)
 

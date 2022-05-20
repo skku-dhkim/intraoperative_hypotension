@@ -12,11 +12,11 @@ if __name__ == '__main__':
     parser.add_argument("--dset_path", type=str, required=True)
     parser.add_argument("--dest_path", type=str, required=True)
 
-    parser.add_argument("--time_seq", type=int, default=30)
+    parser.add_argument("--time_seq", type=int, default=3000)
     parser.add_argument("--time_step", type=int, default=10)
-    parser.add_argument("--target_seq", type=int, default=300)
+    parser.add_argument("--target_seq", type=int, default=30000)
     parser.add_argument("--interval", type=float, default=0.01)
-    parser.add_argument("--test_split", type=float, default=0.2)
+    # parser.add_argument("--test_split", type=float, default=0.2)
     # parser.add_argument("--norm", type=str, default='std')
 
     parser.add_argument("--maxcase", type=int, default=-1)

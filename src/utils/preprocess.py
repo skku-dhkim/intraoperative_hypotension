@@ -25,12 +25,14 @@ def job(file: str, time_seq: int, time_delay: int, prediction_lag: int, dst_path
     data_split(cid, df, time_seq=time_seq, time_delay=time_delay, target_seq=prediction_lag, dst_path=dst_path)
 
 
-def make_dataset(data_path: str, time_seq: int, target_seq: int) -> None:
+def make_dataset(data_path: str, time_seq: int, time_step: int, target_seq: int, dst_path: str) -> None:
     """
     Making dataset from each original case data. Eliminating NA, Fill NA, and labeling are included.
     :param data_path: (str) Original case data directory path
     :param time_seq: (int) Input sequence length. (e.g., 3 minutes to observe for the prediction)
+    :param time_step: (int) Steps for time observing sequences.
     :param target_seq: (int) A number of sequences for output target. (e.g., 5 minutes after input)
+    :param dst_path: (str) Path for saving result.
     :return: None
     """
     file_list = glob.glob(os.path.join(data_path, "original/*.csv"))
@@ -42,7 +44,7 @@ def make_dataset(data_path: str, time_seq: int, target_seq: int) -> None:
     while file_list:
         file = file_list.pop()
         pbar.update(1)
-        p = Process(target=job, args=(file, time_seq, 10, target_seq, '/data/dataset2', ))
+        p = Process(target=job, args=(file, time_seq, time_step, target_seq, dst_path, ))
         p.start()
         processes.append(p)
 

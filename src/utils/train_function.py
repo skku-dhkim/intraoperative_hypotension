@@ -1,6 +1,6 @@
-import numpy as np
+import os.path
+
 import torch
-import os
 import torch.optim as optim
 import torch.nn.functional as F
 
@@ -15,14 +15,15 @@ def train(data_loader,
           epochs,
           optimizer,
           loss_fn,
-          summary_path,
-          model_path,
+          log_path,
           device,
           **kwargs):
 
     # TODO: Tensorboard need to be fixed.
-    writer = SummaryWriter(log_dir=summary_path+"/runs")
-    model = model.to(device)
+    summary_path = os.path.join(log_path, "runs")
+    model_path = os.path.join(log_path, 'check_points')
+
+    writer = SummaryWriter(log_dir=summary_path)
 
     best_score = 0
     test_acc = 0
@@ -42,13 +43,15 @@ def train(data_loader,
     else:
         lr_scheduler = None
 
+    epoch_pbar = tqdm(total=epochs, desc='Training Epochs', position=0)
     for epoch in range(epochs):
         step_counter = 0
         running_loss = 0
         correct = 0
 
-        pbar = tqdm(data_loader, desc="Training steps")
+        model = model.to(device)
 
+        pbar = tqdm(data_loader, desc="Training Steps", position=1)
         for x, y in pbar:
             input_x = x.to(device)
             target_y = y.to(device)
@@ -77,7 +80,7 @@ def train(data_loader,
 
             if step_counter % step_count == 0:
                 running_loss = running_loss / step_count
-                writer.add_scalar('Loss/train', running_loss, epoch*step_counter+step_counter)
+                writer.add_scalar('Loss/train/{}'.format(epoch), running_loss, step_counter)
                 if isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
                     lr_scheduler.step(running_loss)
                 running_loss = 0
@@ -110,6 +113,7 @@ def train(data_loader,
 
         writer.add_scalar('Score', score)
         writer.add_scalar('Accuracy', accuracy, epoch)
+        epoch_pbar.update(1)
     writer.close()
     return model, best_score, test_acc
 
@@ -120,9 +124,9 @@ def test(data_loader, model, device, **kwargs):
     else:
         hidden_flag = False
 
-    pbar = tqdm(data_loader, desc="Test steps")
+    pbar = tqdm(data_loader, desc="Test steps", position=3)
 
-    model.to(device)
+    model.to('cpu')
     with torch.no_grad():
         total_correct = 0
 

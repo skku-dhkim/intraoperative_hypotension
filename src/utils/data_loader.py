@@ -1,12 +1,16 @@
+import random
+
+from . import *
 from src.vitaldb_framework import vitaldb
 import pandas as pd
-import numpy as np
 import os
 import glob
 import torch
 import h5py
+import parmap
+
 from torch.utils.data import DataLoader, Dataset, Sampler, WeightedRandomSampler
-from typing import Callable
+from typing import Callable, Tuple
 
 
 def data_load(data_path, attr, maxcases, interval):
@@ -126,10 +130,91 @@ class ImbalancedDatasetSampler(Sampler):
         return self.num_samples
 
 
-def load_from_hdf5(file_path, dtype):
-    f = h5py.File(file_path, 'r')
+def load_files(data_path: str, test_split_ratio: float) -> Tuple[list, list]:
+    """
+    Args:
+        data_path: (str) Dataset path that holds hdf5 format.
+        test_split_ratio: (float) Split ratio of train and test set.
 
-    data_x = f[dtype]['x']
-    data_y = f[dtype]['y']
+    Returns:
 
+    """
+    file_list = glob.glob(os.path.join(data_path, "*.hdf5"))
+
+    random.shuffle(file_list)
+    n_of_test = int(len(file_list) * test_split_ratio)
+    test_file_list = file_list[:n_of_test]
+    train_file_list = file_list[n_of_test:]
+
+    return train_file_list, test_file_list
+
+
+class HDF5_VitalDataset(Dataset):
+    def __init__(self, file_lists: list):
+        super().__init__()
+        self.x, self.y = self._load_from_hdf5(file_lists)
+
+    def __getitem__(self, index):
+        x = np.array(self.x[index], dtype=np.float32)
+        y = np.array(self.y[index], dtype=np.int64)
+        return x, y
+
+    def __len__(self) -> int:
+        """
+        Returns:
+            (int) length of data X
+        """
+        return len(self.x)
+
+    def get_labels(self) -> list:
+        """
+        Returns:
+            (list) List form of target Y.
+        """
+        return list(self.y)
+
+    def get_shape(self) -> tuple:
+        return self.x.shape
+
+    def _load_from_hdf5(self, file_lists: list) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Args:
+            file_lists: (list) List of files to train or test.
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: Concatenated data from all data path.
+        """
+        result_x = []
+        result_y = []
+
+        # TODO: Remove code when deploy the source. This line only for *TEST*.
+        # file_lists = file_lists[:20]
+
+        result = parmap.map(read_HDF5, file_lists, pm_pbar=True, pm_processes=cpu_counts)
+
+        for res in result:
+            if len(res[0]) <= 0 or len(res[1]) <= 0:
+                # Pass if there is no data at all.
+                continue
+            result_x.append(res[0])
+            result_y.append(res[1])
+
+        result_x = np.concatenate(result_x, axis=0)
+        result_y = np.concatenate(result_y, axis=0)
+
+        return result_x, result_y
+
+
+def read_HDF5(file: str) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Read HDF5 file.
+    Args:
+        file: (str) File path
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: numpy array of data_x and data_y
+    """
+    f = h5py.File(file, 'r')
+    data_x = np.array(f.get('x'), dtype=np.float16)
+    data_y = np.array(f.get('y'), dtype=np.int64)
+    f.close()
     return data_x, data_y

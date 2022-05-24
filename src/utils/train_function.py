@@ -1,167 +1,179 @@
-import os.path
+from . import *
 
 import torch
 import torch.optim as optim
-import torch.nn.functional as F
 
 from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm
-from sklearn.metrics import roc_curve, auc, roc_auc_score
+from sklearn.metrics import roc_auc_score
 
 
-def train(data_loader,
-          test_loader,
-          model,
-          epochs,
-          optimizer,
-          loss_fn,
-          log_path,
-          device,
-          **kwargs):
+class TrainWrapper:
+    def __init__(self,
+                 test_loader: DataLoader,
+                 model: Module,
+                 epochs: int,
+                 optimizer: Optimizer,
+                 loss_fn,
+                 log_path: str,
+                 device: torch.device,
+                 **kwargs):
 
-    # TODO: Tensorboard need to be fixed.
-    summary_path = os.path.join(log_path, "runs")
-    model_path = os.path.join(log_path, 'check_points')
+        # Evaluation settings
+        self.model_path = os.path.join(log_path, 'check_points')
+        self.writer = SummaryWriter(log_dir=os.path.join(log_path, "runs"))
 
-    writer = SummaryWriter(log_dir=summary_path)
+        self.best_score = 0
 
-    best_score = 0
-    test_acc = 0
+        self.test_acc = 0
+        self.running_loss = 0
+        self.correct = 0
 
-    if 'step_count' in kwargs.keys():
-        step_count = kwargs['step_count']
-    else:
-        step_count = 1000
+        # TODO: Make it simple in future.
+        if 'step_count' in kwargs.keys():
+            self.step_count = kwargs['step_count']
+        else:
+            self.step_count = 1000
 
-    if 'hidden' in kwargs.keys():
-        hidden_flag = kwargs['hidden']
-    else:
-        hidden_flag = False
+        if 'hidden' in kwargs.keys():
+            self.hidden_flag = kwargs['hidden']
+        else:
+            self.hidden_flag = False
 
-    if 'lr_scheduler' in kwargs.keys():
-        lr_scheduler = kwargs['lr_scheduler']
-    else:
-        lr_scheduler = None
+        if 'lr_scheduler' in kwargs.keys():
+            self.lr_scheduler = kwargs['lr_scheduler']
+        else:
+            self.lr_scheduler = None
+        ############################################################
 
-    epoch_pbar = tqdm(total=epochs, desc='Training Epochs', position=0)
-    for epoch in range(epochs):
-        step_counter = 0
-        running_loss = 0
-        correct = 0
+        # Model settings
+        self.device = device
+        self.model = model
+        self.model.to(device)
 
-        model = model.to(device)
+        # Training settings
+        self.epochs = epochs
+        self.optimizer = optimizer
+        self.loss_fn = loss_fn
 
-        pbar = tqdm(data_loader, desc="Training Steps", position=1)
+        # Test settings
+        self.test_loader = test_loader
+        self.tl_counter = 0         # Train loader counter
+        self.step_counter = 0
+
+    def fit(self, train_loader: DataLoader, epoch: int) -> None:
+        """
+
+        Args:
+            train_loader: (DataLoader) Data loader of train files.
+            epoch: (int) Represent current epoch. Not epochs in total.
+
+        Returns: None
+
+        """
+        pbar = tqdm(train_loader, desc="Training Steps", position=0)
         for x, y in pbar:
-            input_x = x.to(device)
-            target_y = y.to(device)
+            input_x = x.to(self.device)
+            target_y = y.to(self.device)
 
-            if hidden_flag:
-                hidden = model.init_hidden(input_x.shape[0], device)
-                predicted = model(input_x, hidden)
+            if self.hidden_flag:
+                hidden = self.model.init_hidden(input_x.shape[0], self.device)
+                predicted = self.model(input_x, hidden)
             else:
-                predicted = model(input_x)
+                predicted = self.model(input_x)
 
-            loss = loss_fn(predicted, target_y)
+            # Get loss and back propagation
+            loss = self.loss_fn(predicted, target_y)
 
-            optimizer.zero_grad()
+            self.optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
+            self.optimizer.step()
 
-            step_counter += 1
+            # Training evaluation
+            self.step_counter += 1
 
-            running_loss += loss.item()
+            self.running_loss += loss.item()
             _, predicted = torch.max(predicted.data, 1)
 
-            correct += (predicted == target_y).sum().item()
+            self.correct += (predicted == target_y).sum().item()
 
             pbar.update(1)
             pbar.set_postfix({'Epochs': epoch, "loss": loss.item()})
 
-            if step_counter % step_count == 0:
-                running_loss = running_loss / step_count
-                writer.add_scalar('Loss/train/{}'.format(epoch), running_loss, step_counter)
-                if isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
-                    lr_scheduler.step(running_loss)
-                running_loss = 0
+            if self.step_counter % self.step_count == 0:
+                self.running_loss = self.running_loss / self.step_count
+                self.writer.add_scalar('Loss/train', self.running_loss, self.step_counter)
+                if isinstance(self.lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+                    self.lr_scheduler.step(self.running_loss)
+                self.running_loss = 0
 
-        if lr_scheduler:
-            if not isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
-                lr_scheduler.step()
+        if self.lr_scheduler:
+            if not isinstance(self.lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+                self.lr_scheduler.step()
 
-        score, test_acc = test(test_loader, model, device=device, hidden=hidden_flag)
+    def evaluation(self, epoch: int) -> None:
+        """
+        Args:
+            epoch: (int) Represent current epoch. Not epochs in total.
 
-        if not os.path.exists(model_path):
-            os.makedirs(model_path)
+        Returns: None
+        """
+        score, self.test_acc = self.test()
 
-        if score > best_score:
+        if not os.path.exists(self.model_path):
+            os.makedirs(self.model_path)
+
+        if score > self.best_score:
             torch.save({
                 'epoch': epoch,
-                'state_dict': model.state_dict(),
-                'optimizer': optimizer.state_dict()
-            }, model_path+'/best-model-{}.pt'.format(epoch))
-        else:
-            torch.save({
-                'epoch': epoch,
-                'state_dict': model.state_dict()
-            }, model_path + '/model-{}.pt'.format(epoch))
+                'state_dict': self.model.state_dict(),
+                'optimizer': self.optimizer.state_dict()
+            }, os.path.join(self.model_path, 'best-model-{}.pt'.format(epoch)))
+            self.best_score = score
 
-        accuracy = correct/len(data_loader.dataset) * 100
-        pbar.write("Epoch[{}] - Train Accuracy: {:.2f}".format(epoch, accuracy))
-        pbar.write("Test_acc[{:.2f}] - Score:[{:.2f}]".format(test_acc, score))
-        pbar.close()
+        self.writer.add_scalar('AUC Score', score, epoch)
+        self.writer.add_scalar('Test Accuracy', self.test_acc, epoch)
 
-        writer.add_scalar('Score', score)
-        writer.add_scalar('Accuracy', accuracy, epoch)
-        epoch_pbar.update(1)
-    writer.close()
-    return model, best_score, test_acc
+    def test(self) -> Tuple([float, float]):
+        """
+        Returns:
+            Tuple[float, float]: AUC Score and Accuracy of test set.
+        """
+        pbar = tqdm(self.test_loader, desc="Test steps", position=1)
+        with torch.no_grad():
+            total_correct = 0
+            total_len = 0
 
+            list_y = []
+            list_y_hat = []
 
-def test(data_loader, model, device, **kwargs):
-    if 'hidden' in kwargs.keys():
-        hidden_flag = kwargs['hidden']
-    else:
-        hidden_flag = False
+            for x, y in pbar:
+                x = x.to(self.device)
+                y = y.to(self.device)
 
-    pbar = tqdm(data_loader, desc="Test steps", position=3)
+                if self.hidden_flag:
+                    hidden = self.model.init_hidden(x.shape[0], self.device)
+                    predicted = self.model(x, hidden)
+                    predict_prob = torch.softmax(predicted, dim=1)
+                    _, predicted_y = torch.max(predict_prob, 1)
+                else:
+                    predicted = self.model(x)
+                    predict_prob = torch.softmax(predicted, dim=1)
+                    _, predicted_y = torch.max(predict_prob, 1)
 
-    model.to('cpu')
-    with torch.no_grad():
-        total_correct = 0
+                correct = (predicted_y == y).sum().item()
+                accuracy = (correct / len(y)) * 100
 
-        total_len = 0
-        total_score = 0
-        batch_len = len(pbar)
+                list_y += y.detach().cpu().tolist()
+                list_y_hat += predicted_y.detach().cpu().tolist()
 
-        for x, y in pbar:
-            x = x.to(device)
-            y = y.to(device)
+                total_correct += correct
+                total_len += len(y)
 
-            if hidden_flag:
-                hidden = model.init_hidden(x.shape[0], device)
-                predicted = model(x, hidden)
-                predict_prob = torch.softmax(predicted, dim=1)
-                _, predicted_y = torch.max(predict_prob, 1)
-            else:
-                predicted = model(x)
-                predict_prob = torch.softmax(predicted, dim=1)
-                _, predicted_y = torch.max(predict_prob, 1)
+                pbar.set_postfix({"Test Accuracy": accuracy})
 
-            correct = (predicted_y == y).sum().item()
-            accuracy = (correct/len(y)) * 100
+        total_accuracy = (total_correct / total_len) * 100
+        total_score = roc_auc_score(list_y, list_y_hat)
 
-            total_correct += correct
-            total_len += len(y)
+        pbar.write("AUC score[{:.2f}] / Accuracy: {:.2f}".format(total_score, total_accuracy))
 
-            score = roc_auc_score(y.detach().cpu().tolist(), predicted_y.detach().cpu().tolist())
-            total_score += score
-
-            pbar.set_postfix({"Accuracy": accuracy, "AUROC Score": score})
-
-    total_score = total_score/batch_len
-    total_accuracy = (total_correct/total_len)*100
-
-    pbar.write("AUC score[{:.2f}] / Accuracy: {:.2f}".format(total_score, total_accuracy))
-
-    return total_score, total_accuracy
+        return total_score, total_accuracy

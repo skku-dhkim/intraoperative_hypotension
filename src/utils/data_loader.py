@@ -1,9 +1,13 @@
-import random
-
+"""
+    @ Author: DONGHEE KIM.
+    @ Sungkyunkwan University and Hippo T&C all rights reserved.
+"""
 from . import *
 from src.vitaldb_framework import vitaldb
+
+import random
+import numpy as np
 import pandas as pd
-import os
 import glob
 import torch
 import h5py
@@ -13,7 +17,7 @@ from torch.utils.data import DataLoader, Dataset, Sampler, WeightedRandomSampler
 from typing import Callable, Tuple
 
 
-def data_load(data_path, attr, maxcases, interval):
+def data_load(data_path: str, attr: list, maxcases: int, interval: float) -> None:
     if not os.path.isdir(data_path):
         os.mkdir(data_path)
 
@@ -26,6 +30,7 @@ def data_load(data_path, attr, maxcases, interval):
     )
 
 
+# TODO: Deprecated in the future.
 def composite(data_path, attr):
     df = pd.DataFrame(columns=attr)
     total = len(glob.glob("./data/{}/original/*.csv".format(data_path)))
@@ -45,6 +50,7 @@ def composite(data_path, attr):
     return "./data/{}/dataset.csv".format(data_path)
 
 
+# TODO: Deprecated in the future.
 def matching_caseID(data_path):
     dataset = pd.read_csv("./data/{}/dataset.csv".format(data_path))
     case_id = dataset['CID'].unique()
@@ -60,6 +66,7 @@ def matching_caseID(data_path):
         raise FileNotFoundError("You should move or create \'total_cases.csv\' file first.")
 
 
+# TODO: Deprecated in the future.
 class VitalDataset(Dataset):
     def __init__(self, x_tensor, y_tensor):
         super(Dataset, self).__init__()
@@ -78,6 +85,7 @@ class VitalDataset(Dataset):
         return list(self.y)
 
 
+# TODO: Need to be checked.
 class ImbalancedDatasetSampler(Sampler):
     """Samples elements randomly from a given list of indices for imbalanced dataset
 
@@ -176,6 +184,10 @@ class HDF5_VitalDataset(Dataset):
     def get_shape(self) -> tuple:
         return self.x.shape
 
+    def label_counts(self) -> dict:
+        unique, counts = np.unique(self.y, return_counts=True)
+        return dict(zip(unique, counts))
+
     def _load_from_hdf5(self, file_lists: list) -> Tuple[np.ndarray, np.ndarray]:
         """
         Args:
@@ -186,17 +198,19 @@ class HDF5_VitalDataset(Dataset):
         result_x = []
         result_y = []
 
-        # TODO: Remove code when deploy the source. This line only for *TEST*.
-        # file_lists = file_lists[:20]
-
         result = parmap.map(read_HDF5, file_lists, pm_pbar=True, pm_processes=cpu_counts)
 
-        for res in result:
+        pbar = tqdm(total=len(result), desc='Making numpy array', mininterval=0.01)
+        while result:
+            res = result.pop()
             if len(res[0]) <= 0 or len(res[1]) <= 0:
                 # Pass if there is no data at all.
+                pbar.update(1)
                 continue
             result_x.append(res[0])
             result_y.append(res[1])
+            del res
+            pbar.update(1)
 
         result_x = np.concatenate(result_x, axis=0)
         result_y = np.concatenate(result_y, axis=0)

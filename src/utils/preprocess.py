@@ -1,6 +1,5 @@
 import pandas as pd
 import glob
-import os
 import h5py
 import pickle
 from . import *
@@ -11,7 +10,7 @@ from datetime import datetime
 from multiprocessing import Process
 
 
-def job(file: str, time_seq: int, time_delay: int, prediction_lag: int, dst_path: str):
+def job(file: str, time_seq: int, time_delay: int, prediction_lag: int, dst_path: str) -> None:
     # Get CID
     cid = file.split("/")[-1].split(".")[0]
     # Read csv
@@ -152,7 +151,7 @@ def normalization(data_frame: DataFrame, file_save: bool, scaler=None, dataset_p
     return df, scaler
 
 
-def eliminate_na(data_frame):
+def eliminate_na(data_frame: DataFrame) -> DataFrame:
     """
     Eliminate NA on NIBP_SBP and MAC
     :param data_frame: (Dataframe) Input dataframe.

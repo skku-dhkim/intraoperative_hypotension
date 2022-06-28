@@ -1,13 +1,12 @@
-import pandas as pd
-import glob
-import h5py
-import pickle
+from .. import *
 from . import *
-
-from tqdm import tqdm
 from sklearn.preprocessing import StandardScaler
 from datetime import datetime
 from multiprocessing import Process
+
+import glob
+import h5py
+import pickle
 
 
 def job(file: str, time_seq: int, time_delay: int, prediction_lag: int, dst_path: str) -> None:
@@ -44,7 +43,7 @@ def make_dataset(data_path: str, time_seq: int, time_step: int, target_seq: int,
         p.start()
         processes.append(p)
 
-        if len(processes) >= cpu_counts:
+        if len(processes) >= os.cpu_count():
             while processes:
                 _p = processes.pop()
                 _p.join()
@@ -108,6 +107,12 @@ def data_split(
     save_path = os.path.join(dst_path, date_time)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
+
+    if not os.path.exists(os.path.join(save_path, "Datameta.txt")):
+        with open(os.path.join(save_path, "Datameta.txt"), "w") as file:
+            file.write("time_seq: {}\n".format(time_seq))
+            file.write("target_seq: {}\n".format(target_seq))
+            file.write("time_delay: {}\n".format(time_delay))
 
     save_path = os.path.join(save_path, "{}.hdf5".format(cid))
 

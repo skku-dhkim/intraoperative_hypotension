@@ -3,10 +3,24 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+
+def call_loss_fn(loss_name, **kwargs):
+    if loss_name.lower() == 'tilt':
+        criterion = Tilted_Loss_()
+    elif loss_name.lower() == 'focal':
+        # criterion = FocalLoss(gamma=2,alpha=[0.25,0.75]) ##weight//check
+        criterion = FocalLoss(**kwargs)
+    elif loss_name.lower() == 'cross':
+        criterion = nn.CrossEntropyLoss()
+    else:
+        raise NotImplementedError()
+    return criterion
+
+
 class WeightedFocalLoss(nn.Module):
     def __init__(self, alpha=.25, gamma=2):
         super(WeightedFocalLoss, self).__init__()
-        self.alpha = torch.tensor([alpha, 1-alpha]).cuda()
+        self.alpha = torch.tensor([alpha, 1 - alpha]).cuda()
         self.gamma = gamma
 
     def forward(self, inputs, targets):
@@ -14,51 +28,53 @@ class WeightedFocalLoss(nn.Module):
         targets = targets.type(torch.long)
         at = self.alpha.gather(0, targets.data.view(-1))
         pt = torch.exp(-BCE_loss)
-        F_loss = at*(1-pt)**self.gamma * BCE_loss
+        F_loss = at * (1 - pt) ** self.gamma * BCE_loss
         return F_loss.mean()
 
 
 class FocalLoss(nn.Module):
-    def __init__(self, gamma=0, alpha=None, size_average=True):
+    def __init__(self, gamma=0, alpha=None, size_average=True, **kwargs):
         super(FocalLoss, self).__init__()
         self.gamma = gamma
         self.alpha = alpha
-        if isinstance(alpha,(float,int,int)): self.alpha = torch.Tensor([alpha,1-alpha])
-        if isinstance(alpha,list): self.alpha = torch.Tensor(alpha)
+        if isinstance(alpha, (float, int, int)): self.alpha = torch.Tensor([alpha, 1 - alpha])
+        if isinstance(alpha, list): self.alpha = torch.Tensor(alpha)
         self.size_average = size_average
 
     def forward(self, input, target):
-        if input.dim()>2:
-            input = input.view(input.size(0),input.size(1),-1)  # N,C,H,W => N,C,H*W
-            input = input.transpose(1,2)    # N,C,H*W => N,H*W,C
-            input = input.contiguous().view(-1,input.size(2))   # N,H*W,C => N*H*W,C
-        target = target.view(-1,1)
+        if input.dim() > 2:
+            input = input.view(input.size(0), input.size(1), -1)  # N,C,H,W => N,C,H*W
+            input = input.transpose(1, 2)  # N,C,H*W => N,H*W,C
+            input = input.contiguous().view(-1, input.size(2))  # N,H*W,C => N*H*W,C
+        target = target.view(-1, 1)
 
         logpt = F.log_softmax(input)
-        logpt = logpt.gather(1,target)
+        logpt = logpt.gather(1, target)
         logpt = logpt.view(-1)
         pt = Variable(logpt.data.exp())
 
         if self.alpha is not None:
-            if self.alpha.type()!=input.data.type():
+            if self.alpha.type() != input.data.type():
                 self.alpha = self.alpha.type_as(input.data)
-            at = self.alpha.gather(0,target.data.view(-1))
+            at = self.alpha.gather(0, target.data.view(-1))
             logpt = logpt * Variable(at)
 
-        loss = -1 * (1-pt)**self.gamma * logpt
-        if self.size_average: return loss.mean()
-        else: return loss.sum()
+        loss = -1 * (1 - pt) ** self.gamma * logpt
+        if self.size_average:
+            return loss.mean()
+        else:
+            return loss.sum()
+
 
 ##new tilted loss
 class Tilted_Loss(nn.Module):
-    def __init__(self, tau=-0.7, t=4.3, n_classes=2):
+    def __init__(self, tau=-0.3, t=4.3, n_classes=2):
         super(Tilted_Loss, self).__init__()
         self.n_classes = n_classes
         self.tau = tau
         self.t = t
 
     def forward(self, y_pred, y_true):
-
         batch_size = y_pred.shape[0]
         inds = [[i for i in range(batch_size) if k == y_true[i]] for k in range(self.n_classes)]  ##index of each class.
 
@@ -81,12 +97,14 @@ class Tilted_Loss(nn.Module):
                 loss_k = 1 / self.tau * torch.log(average_k)  # tau_tilted_loss of class k
 
                 loss += len(inds[k]) * torch.exp(
-                    loss_k * self.t) / batch_size/7000000000000##inter class loss averaging with t-tilting
+                    loss_k * self.t) / batch_size / 10000000000000  ##inter class loss averaging with t-tilting
 
         return loss
 
+
+##use??
 class Tilted_Loss_(nn.Module):
-    def __init__(self,  t=6.0, n_classes=2):
+    def __init__(self, t=4.3, n_classes=2):
         super(Tilted_Loss_, self).__init__()
         self.n_classes = n_classes
         self.t = t
@@ -101,7 +119,6 @@ class Tilted_Loss_(nn.Module):
 
         cross_entropy = -torch.log(soft_yp)
 
-
         loss = torch.zeros(1).cuda()  ##total class loss
 
         ##t-tilt on each class and averaging
@@ -113,6 +130,6 @@ class Tilted_Loss_(nn.Module):
                 loss_k = average_k  # tau_tilted_loss of class k
 
                 loss += len(inds[k]) * torch.exp(
-                    loss_k * self.t) / batch_size/1000000000000000##inter class loss averaging with t-tilting
+                    loss_k * self.t) / batch_size / 10000000000000  ##inter class loss averaging with t-tilting
 
         return loss

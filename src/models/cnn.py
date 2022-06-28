@@ -1,8 +1,7 @@
 import torch
 import torch.nn.functional as F
-import copy
 import math
-from torch import nn, ones
+from torch import nn
 from src.models.attentions import MultiHeadAttention
 
 
@@ -128,27 +127,35 @@ class Attention(nn.Module):
         return out
 
 
-class Encoder(nn.Module):
-    def __init__(self, input_size: int, embedding_dim: int, sequences: int, device):
-        super(Encoder, self).__init__()
+class Embedding(nn.Module):
+    def __init__(self, input_size: int, embedding_dim: int, sequences: int, nonlinear=False, sequence_first=False):
+        super(Embedding, self).__init__()
         self.layers = []
+        self.sequence_first = sequence_first
 
         def create_linear(in_c, out_c):
-            linear = nn.Sequential(
-                nn.Linear(in_features=in_c, out_features=out_c),
-                nn.ReLU()
-            )
+            if nonlinear:
+                linear = nn.Sequential(
+                    nn.Linear(in_features=in_c, out_features=out_c, bias=False),
+                    nn.ReLU()
+                )
+            else:
+                linear = nn.Sequential(
+                    nn.Linear(in_features=in_c, out_features=out_c, bias=False)
+                )
             return linear
         self.layers = nn.ModuleList([create_linear(sequences, embedding_dim) for _ in range(input_size)])
 
     def forward(self, x):
-        x = x.transpose(1, 2)
+        x = x.transpose(1, 2).contiguous()             # (batch, features, sequences)
         output_list = []
         for idx in range(x.shape[1]):
             _x = x[:, idx, :]
-            _x = _x.reshape(-1, 1, _x.shape[-1])
-            output_list.append(self.layers[idx](_x))
-        out = torch.concat(output_list, dim=1)
+            _x = _x.reshape(-1, 1, _x.shape[-1])        # (batches ,1, sequences)
+            output_list.append(self.layers[idx](_x))    # (batches, idx, 1, embedding_dim)
+        out = torch.concat(output_list, dim=1)          # (batches, num_of_features, embedding_dim)
+        if self.sequence_first:
+            out = out.transpose(1, 2).contiguous()
         return out
 
 
@@ -158,16 +165,14 @@ class AttentionCNN(nn.Module):
                  embedding_dim: int,
                  attention_dim: int,
                  sequences: int,
-                 num_of_classes: int,
-                 device):
+                 num_of_classes: int):
         super(AttentionCNN, self).__init__()
         self.encoder = Encoder(input_size=input_size,
                                embedding_dim=embedding_dim,
-                               sequences=sequences,
-                               device=device).to(device)
-        self.attention = Attention(embedding_size=embedding_dim, output_dim=attention_dim).to(device)
+                               sequences=sequences)
+        self.attention = Attention(embedding_size=embedding_dim, output_dim=attention_dim)
         self.linear = nn.Sequential(
-            nn.Conv1d(in_channels=input_size, out_channels=1, kernel_size=1),
+            nn.Conv1d(in_channels=input_size, out_channels=1, kernel_size=(1, 1)),
             nn.ReLU()
         )
         self.FC = nn.Linear(in_features=attention_dim, out_features=num_of_classes)
@@ -188,14 +193,12 @@ class MultiHeadAttentionCNN(nn.Module):
                  attention_dim: int,
                  num_heads: int,
                  sequences: int,
-                 num_of_classes: int,
-                 device):
+                 num_of_classes: int):
         super(MultiHeadAttentionCNN, self).__init__()
         self.embedding_dim = embedding_dim
-        self.encoder = Encoder(input_size=input_size,
-                               embedding_dim=embedding_dim,
-                               sequences=sequences,
-                               device=device).to(device)
+        self.encoder = Embedding(input_size=input_size,
+                                 embedding_dim=embedding_dim,
+                                 sequences=sequences)
         self.multi_head_attn = MultiHeadAttention(d_model=embedding_dim, num_heads=num_heads)
         self.rnn = nn.RNN(input_size=embedding_dim, hidden_size=embedding_dim)
         self.linear = nn.Sequential(
@@ -206,11 +209,11 @@ class MultiHeadAttentionCNN(nn.Module):
         self.fc = nn.Linear(int(embedding_dim/2), num_of_classes)
 
     def forward(self, x, hidden):
-        out = self.encoder(x)
+        out = self.encoder(x)#(batch_size,features,len)
         context, attn = self.multi_head_attn(key=out,
                                              query=out,
                                              value=out)
-        context = context.transpose(0, 1)
+        context = context.transpose(0, 1) #(features,batch_size,len) -> (batch_size,features,len)
         out, _ = self.rnn(context, hidden)
         out = out[-1]
         out = self.linear(out)
@@ -220,3 +223,68 @@ class MultiHeadAttentionCNN(nn.Module):
     def init_hidden(self, batch_size, device):
         hidden = torch.ones(1, batch_size, self.embedding_dim, device=device)
         return hidden
+
+
+# TODO: causal_cnn --> cnn.py
+class CausalOneDimCNN(nn.Module):
+    def __init__(self, input_size: int, hidden_dim: int, num_of_classes: int):
+        super(CausalOneDimCNN, self).__init__()
+        init_channel = 32
+        self.net = nn.Sequential(
+            ResUnit(in_channels=8, size=3, dilation=2),
+            ResUnit(in_channels=8, size=3, dilation=2),
+            ResUnit(in_channels=8, size=3, dilation=2),
+            ResUnit(in_channels=8, size=3, dilation=2),
+            nn.BatchNorm1d(8),
+
+        )
+
+        self.fc = nn.Sequential(
+            nn.Linear(24000, 512),
+            nn.ReLU(),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, num_of_classes)
+        )
+
+    def forward(self, x):
+        x = x.transpose(1, 2)
+        out = self.net(x)
+        out = nn.Flatten()(out)
+        out = self.fc(out)
+        return out
+
+
+class ResUnit(nn.Module):
+    def __init__(self, in_channels, size=3, dilation=1, causal=True, in_ln=True):
+        super(ResUnit, self).__init__()
+        self.size = size
+        self.dilation = dilation
+        self.causal = causal
+        self.in_ln = in_ln
+        if self.in_ln:
+            self.ln1 = nn.InstanceNorm1d(in_channels, affine=True)
+            self.ln1.weight.data.fill_(1.0)
+        self.conv_in = nn.Conv1d(in_channels, in_channels//2, 1)
+        self.ln2 = nn.InstanceNorm1d(in_channels//2, affine=True)
+        self.ln2.weight.data.fill_(1.0)
+        self.conv_dilated = nn.Conv1d(in_channels//2, in_channels//2, size, dilation=self.dilation,
+                                      padding=((dilation*(size-1)) if causal else (dilation*(size-1)//2)))
+        self.ln3 = nn.InstanceNorm1d(in_channels//2, affine=True)
+        self.ln3.weight.data.fill_(1.0)
+        self.conv_out = nn.Conv1d(in_channels//2, in_channels, 1)
+
+    def forward(self, inp):
+        x = inp
+        if self.in_ln:
+            x = self.ln1(x)
+        x = nn.functional.leaky_relu(x)
+        x = nn.functional.leaky_relu(self.ln2(self.conv_in(x)))
+        x = self.conv_dilated(x)
+        if self.causal and self.size>1:
+            x = x[:,:,:-self.dilation*(self.size-1)]
+        x = nn.functional.leaky_relu(self.ln3(x))
+        x = self.conv_out(x)
+        return x+inp

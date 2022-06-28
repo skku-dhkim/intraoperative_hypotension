@@ -158,7 +158,7 @@ class MultiHeadLocationAwareAttention(nn.Module):
     Applies a multi-headed location-aware attention mechanism on the output features from the decoder.
     Location-aware attention proposed in "Attention-Based Models for Speech Recognition" paper.
     The location-aware attention mechanism is performing well in speech recognition tasks.
-    In the above paper applied a signle head, but we applied multi head concept.
+    In the above paper applied a single head, but we applied multi head concept.
 
     Args:
         hidden_dim (int): The number of expected features in the output

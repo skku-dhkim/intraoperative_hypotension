@@ -1,19 +1,11 @@
-import h5py
 import torch
-import numpy as np
-import torch.nn as nn
-import torch.optim as optim
 import argparse
-import random
 
-from tqdm import tqdm
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from src.utils.data_loader import VitalDataset, load_from_hdf5
-from src.utils.train_function import train, test
+from src.train.train_function import test
 from src.models.rnn import ValinaLSTM
 from src.models.cnn import OneDimCNN, MultiChannelCNN, AttentionCNN, MultiHeadAttentionCNN
-from src.utils.data_loader import ImbalancedDatasetSampler
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -87,6 +79,7 @@ if __name__ == "__main__":
 
     weights = torch.load(args.weight_path, map_location=device)
     model.load_state_dict(weights['state_dict'])
+    model.eval()
     score, accuracy = test(data_loader=test_loader, model=model, hidden=hidden, device=device)
     print(score, accuracy)
 

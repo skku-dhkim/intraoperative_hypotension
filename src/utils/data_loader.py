@@ -2,19 +2,18 @@
     @ Author: DONGHEE KIM.
     @ Sungkyunkwan University and Hippo T&C all rights reserved.
 """
+from .. import *
 from . import *
 from src.vitaldb_framework import vitaldb
+from torch.utils.data import DataLoader, Dataset, Sampler, WeightedRandomSampler
+from typing import Callable, Tuple
 
 import random
-import numpy as np
-import pandas as pd
 import glob
 import torch
 import h5py
 import parmap
-
-from torch.utils.data import DataLoader, Dataset, Sampler, WeightedRandomSampler
-from typing import Callable, Tuple
+import gc
 
 
 def data_load(data_path: str, attr: list, maxcases: int, interval: float) -> None:
@@ -64,25 +63,6 @@ def matching_caseID(data_path):
         print("[Done] Matching IDs...")
     except FileNotFoundError:
         raise FileNotFoundError("You should move or create \'total_cases.csv\' file first.")
-
-
-# TODO: Deprecated in the future.
-class VitalDataset(Dataset):
-    def __init__(self, x_tensor, y_tensor):
-        super(Dataset, self).__init__()
-        self.x = x_tensor
-        self.y = y_tensor
-
-    def __getitem__(self, index):
-        x = np.array(self.x[index], dtype=np.float32)
-        y = np.array(self.y[index], dtype=np.int64)
-        return x, y
-
-    def __len__(self):
-        return len(self.x)
-
-    def get_labels(self):
-        return list(self.y)
 
 
 # TODO: Need to be checked.
@@ -182,7 +162,7 @@ class HDF5_VitalDataset(Dataset):
         return list(self.y)
 
     def get_shape(self) -> tuple:
-        return self.x.shape
+        return self.x.shape, self.y.shape
 
     def label_counts(self) -> dict:
         unique, counts = np.unique(self.y, return_counts=True)
@@ -198,7 +178,7 @@ class HDF5_VitalDataset(Dataset):
         result_x = []
         result_y = []
 
-        result = parmap.map(read_HDF5, file_lists, pm_pbar=True, pm_processes=cpu_counts)
+        result = parmap.map(read_HDF5, file_lists, pm_pbar=True, pm_processes=os.cpu_count())
 
         pbar = tqdm(total=len(result), desc='Making numpy array', mininterval=0.01)
         while result:
@@ -210,6 +190,7 @@ class HDF5_VitalDataset(Dataset):
             result_x.append(res[0])
             result_y.append(res[1])
             del res
+            gc.collect()
             pbar.update(1)
 
         result_x = np.concatenate(result_x, axis=0)

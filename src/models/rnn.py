@@ -1,12 +1,12 @@
 import torch
 import torch.nn.functional as F
-from torch import nn, ones
+from torch import nn
 
 
 class ValinaLSTM(nn.Module):
-    def __init__(self, input_size: int, hidden_size: int, layers: int, num_of_classes: int):
+    def __init__(self, input_size: int, hidden_size: int, num_of_classes: int, **kwargs):
         super(ValinaLSTM, self).__init__()
-        self.layer = layers
+        self.layers = kwargs['layers']
         self.hidden_units = hidden_size
         self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=layers)
         self.linear = nn.Linear(hidden_size, 128)

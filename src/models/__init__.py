@@ -2,7 +2,7 @@ from .. import *
 from .cnn import OneDimCNN, CausalOneDimCNN, MultiChannelCNN, AttentionCNN, MultiHeadAttentionCNN
 from .rnn import ValinaLSTM
 from .galr import GALRBlock
-from .attention_galr import AttentiveGALR
+from .attention_galr import AttentiveGALR, MultiheadAttentionGALR
 # import torch
 # from torch import nn
 
@@ -70,6 +70,14 @@ def call_models(model_name: str,
                               # num_layers=kwargs['num_layers'],
                               num_classes=num_of_classes,
                               **kwargs)
+    elif model_name.lower() == 'multihead_attention_galr':
+        model = MultiheadAttentionGALR(
+            input_size=features,
+            sequences=sequences,
+            num_heads=kwargs['num_of_heads'],
+            num_classes=num_of_classes,
+            **kwargs
+        )
     else:
         raise NotImplementedError()
     return model

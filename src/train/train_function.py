@@ -232,6 +232,7 @@ class TrainActor:
 
         # NOTE: Train Settings
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         self.model = call_models(model_name=model_settings['model_name'],
                                  features=model_settings['features'],
                                  embedding_dim=model_settings['embedding_dim'],
@@ -241,9 +242,11 @@ class TrainActor:
                                  hop_size=model_settings['hop_size'],
                                  hidden_channels=model_settings['hidden_channels'],
                                  num_layers=model_settings['num_layers'],
-                                 low_dimension=model_settings['low_dimension']).to(self.device)
+                                 low_dimension=model_settings['low_dimension'],
+                                 linear=model_settings['linear']).to(self.device)
         self.optimizer = call_optimizer(optim_name=train_settings['optimizer'])(self.model.parameters(), lr=hyper_params['lr'])
-        self.loss_fn = call_loss_fn(train_settings['loss_fn']).to(self.device)
+        self.loss_fn = call_loss_fn(train_settings['loss_fn']).to(self.device)##grad_clip??
+        self.clip = train_settings['clip']
 
         # Evaluation settings
         dt = datetime.now().strftime("%d-%m-%Y_%H:%M")
@@ -284,11 +287,11 @@ class TrainActor:
         self.scaler.scale(loss).backward()
         self.scaler.unscale_(self.optimizer)
 
-        if torch.isfinite(loss):
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1000.0)
-
-        elif not torch.isnan(loss):
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10.0)
+        if self.clip:
+            if torch.isfinite(loss):
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1000.0)
+            elif not torch.isnan(loss):
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10.0)
 
         self.scaler.step(self.optimizer)
         self.scaler.update()

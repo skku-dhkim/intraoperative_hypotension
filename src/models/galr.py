@@ -10,12 +10,12 @@ class GALR(nn.Module):
     def __init__(self,
                  num_features,
                  hidden_channels,
-                 num_blocks=6,
+                 num_blocks=3, #size change
                  num_heads=8,
                  norm=True,
                  dropout=1e-1,
                  low_dimension=True,
-                 causal=False,
+                 causal=True,
                  eps=EPS,
                  **kwargs):
         super().__init__()
@@ -55,7 +55,7 @@ class GALRBlock(nn.Module):
                  num_features,
                  hidden_channels,
                  num_heads=8,
-                 causal=False,
+                 causal=True,
                  norm=True,
                  dropout=1e-1,
                  low_dimension=True,
@@ -122,7 +122,7 @@ class GloballyAttentiveBlockBase(nn.Module):
 
 
 class GloballyAttentiveBlock(GloballyAttentiveBlockBase):
-    def __init__(self, num_features, num_heads=8, causal=False, norm=True, dropout=1e-1, eps=EPS):
+    def __init__(self, num_features, num_heads=8, causal=True, norm=True, dropout=1e-1, eps=EPS):
         super().__init__()
 
         self.norm = norm
@@ -180,7 +180,7 @@ class GloballyAttentiveBlock(GloballyAttentiveBlockBase):
 
 
 class LowDimensionGloballyAttentiveBlock(GloballyAttentiveBlockBase):
-    def __init__(self, num_features, chunk_size=100, down_chunk_size=32, num_heads=8, causal=False, norm=True,
+    def __init__(self, num_features, chunk_size=100, down_chunk_size=32, num_heads=8, causal=True, norm=True,
                  dropout=1e-1, eps=EPS):
         super().__init__()
 
@@ -400,7 +400,11 @@ class CumulativeLayerNorm1d(nn.Module):
         cum_sum = torch.cumsum(step_sum, dim=1)  # (batch_size, T)
         cum_squared_sum = torch.cumsum(step_squared_sum, dim=1)  # (batch_size, T)
 
-        cum_num = torch.arange(C, C * (T + 1), C, dtype=torch.float)  # (T, ): [C, 2*C, ..., T*C]
+        if torch.cuda.is_available():
+            cum_num = torch.arange(C, C * (T + 1), C, dtype=torch.float).cuda()  # (T, ): [C, 2*C, ..., T*C]
+        else:
+            cum_num = torch.arange(C, C * (T + 1), C, dtype=torch.float)  # (T, ): [C, 2*C, ..., T*C]
+
         cum_mean = cum_sum / cum_num  # (batch_size, T)
         cum_squared_mean = cum_squared_sum / cum_num
         cum_var = cum_squared_mean - cum_mean ** 2

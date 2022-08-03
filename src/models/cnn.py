@@ -128,34 +128,47 @@ class Attention(nn.Module):
 
 
 class Embedding(nn.Module):
-    def __init__(self, input_size: int, embedding_dim: int, sequences: int, nonlinear=False, sequence_first=False):
+    """
+    Linear embedding module.
+    """
+    def __init__(self, input_size: int, embedding_dim: int, sequences: int, linear=True, sequence_first=False, axis=0):
         super(Embedding, self).__init__()
         self.layers = []
         self.sequence_first = sequence_first
+        self.axis = axis
 
         def create_linear(in_c, out_c):
-            if nonlinear:
-                linear = nn.Sequential(
+            if linear:
+                layer = nn.Sequential(
+                    nn.Linear(in_features=in_c, out_features=out_c, bias=False)
+                )
+            else:
+                layer = nn.Sequential(
                     nn.Linear(in_features=in_c, out_features=out_c, bias=False),
                     nn.ReLU()
                 )
-            else:
-                linear = nn.Sequential(
-                    nn.Linear(in_features=in_c, out_features=out_c, bias=False)
-                )
-            return linear
-        self.layers = nn.ModuleList([create_linear(sequences, embedding_dim) for _ in range(input_size)])
+            return layer
+        if self.axis == 0:
+            self.layers = create_linear(input_size, embedding_dim)
+        else:
+            self.layers = nn.ModuleList([create_linear(sequences, embedding_dim) for _ in range(input_size)])
 
     def forward(self, x):
-        x = x.transpose(1, 2).contiguous()             # (batch, features, sequences)
-        output_list = []
-        for idx in range(x.shape[1]):
-            _x = x[:, idx, :]
-            _x = _x.reshape(-1, 1, _x.shape[-1])        # (batches ,1, sequences)
-            output_list.append(self.layers[idx](_x))    # (batches, idx, 1, embedding_dim)
-        out = torch.concat(output_list, dim=1)          # (batches, num_of_features, embedding_dim)
-        if self.sequence_first:
-            out = out.transpose(1, 2).contiguous()
+        if self.axis != 0:
+            x = x.transpose(1, 2).contiguous()             # (batch, sequence, features) -> (batch, features, sequences)
+            output_list = []
+            for idx in range(x.shape[1]):
+                _x = x[:, idx, :]
+                _x = _x.reshape(-1, 1, _x.shape[-1])        # (batches ,1, sequences)
+                output_list.append(self.layers[idx](_x))    # (batches, idx, 1, embedding_dim)
+            out = torch.concat(output_list, dim=1)          # (batches, num_of_features, embedding_dim)
+            if self.sequence_first:
+                out = out.transpose(1, 2).contiguous()  # (batches, embedding_dim, num_of_features)
+        else:
+            out = self.layers(x)
+            if not self.sequence_first:
+                out = out.transpose(1, 2).contiguous()  # (batches, embedding_dim, num_of_features)
+
         return out
 
 
@@ -288,3 +301,101 @@ class ResUnit(nn.Module):
         x = nn.functional.leaky_relu(self.ln3(x))
         x = self.conv_out(x)
         return x+inp
+
+## The model proposed in previous hypotension prediction paper
+
+# Uni-dimensional convolutional neural network
+class Net(nn.Module):
+    def __init__(self):
+
+        super(Net, self).__init__()
+
+        self.dr = 0.3
+        self.final = 2
+        self.inc = 8
+
+        self.emb = gEmbedding(input_size=8, embedding_dim=3000, sequences=3000, linear=True)
+
+        self.conv1 = nn.Sequential(
+            nn.Conv1d(in_channels=self.inc, out_channels=64, kernel_size=10, stride=1, padding=0),
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
+            nn.MaxPool1d(2, stride=2),
+            nn.Dropout(self.dr)
+        )
+
+        self.conv2 = nn.Sequential(
+            nn.Conv1d(64, 128, kernel_size=16, stride=1, padding=1),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.MaxPool1d(2, stride=2),
+            nn.Dropout(self.dr)
+        )
+
+        self.conv3 = nn.Sequential(
+            nn.Conv1d(128, 128, kernel_size=16, stride=1, padding=1),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.MaxPool1d(2, stride=2),
+            nn.Dropout(self.dr)
+        )
+
+        self.conv4 = nn.Sequential(
+            nn.Conv1d(128, 128, kernel_size=16, stride=1, padding=1),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.MaxPool1d(2, stride=2),
+            nn.Dropout(self.dr)
+        )
+
+        self.conv5 = nn.Sequential(
+            nn.Conv1d(128, 64, kernel_size=16, stride=1, padding=1),
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
+            nn.MaxPool1d(2, stride=2),
+            nn.Dropout(self.dr)
+        )
+
+        self.conv6 = nn.Sequential(
+            nn.Conv1d(64, 32, kernel_size=16, stride=1, padding=1),
+            nn.BatchNorm1d(32),
+            nn.ReLU(),
+            nn.MaxPool1d(2, stride=2),
+            nn.Dropout(self.dr)
+        )
+
+        self.conv7 = nn.Sequential(
+            nn.Conv1d(32, 32, kernel_size=16, stride=1, padding=1),
+            nn.BatchNorm1d(32),
+            nn.ReLU(),
+            nn.MaxPool1d(2, stride=2),
+            nn.Dropout(self.dr)
+        )
+
+        self.fc = nn.Sequential(
+            nn.Linear(320, self.final),
+            nn.Dropout(self.dr)
+        )
+
+        self.activation = nn.Sigmoid()
+
+    def forward(self, x):
+
+        #x = x.view(x.shape[0], self.inc, -1)
+        # x = self.emb(x)
+        x = x.transpose(-2, -1).contiguous()  # (batch, features, sequences)
+
+        out = self.conv1(x)
+        out = self.conv2(out)
+        out = self.conv3(out)
+        out = self.conv4(out)
+        out = self.conv5(out)
+        out = self.conv6(out)
+        out = self.conv7(out)
+
+        out = out.view(x.shape[0], out.size(1) * out.size(2))
+
+        out = self.fc(out)
+        out = self.activation(out)
+
+        return out

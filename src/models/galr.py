@@ -23,7 +23,7 @@ class GALR(nn.Module):
         # Network configuration
         net = []
 
-        for _ in range(num_blocks):
+        for _ in range(num_blocks-1):
             net.append(GALRBlock(num_features,
                                  hidden_channels,
                                  num_heads=num_heads,
@@ -36,6 +36,18 @@ class GALR(nn.Module):
                                  )
                        )
 
+        net.append(GALRBlock(num_features,
+                             hidden_channels,
+                             num_heads=num_heads,
+                             norm=norm,
+                             dropout=dropout,
+                             low_dimension=low_dimension,
+                             causal=causal,
+                             eps=eps,
+                             attn_op=True,
+                             **kwargs)
+                   )
+
         self.net = nn.Sequential(*net)
 
     def forward(self, input_x):
@@ -44,7 +56,9 @@ class GALR(nn.Module):
             input_x (batch_size, num_features, S, chunk_size)
         Returns:
             output (batch_size, num_features, S, chunk_size)
+
         """
+
         output = self.net(input_x)
 
         return output
@@ -60,8 +74,10 @@ class GALRBlock(nn.Module):
                  dropout=1e-1,
                  low_dimension=True,
                  eps=EPS,
+                 attn_op=False,
                  **kwargs):
         super().__init__()
+        self.attn_op = attn_op
 
         self.intra_chunk_block = IntraChunkRNN(num_features, hidden_channels=hidden_channels, norm=norm)
 
@@ -75,6 +91,7 @@ class GALRBlock(nn.Module):
                                                                         causal=causal,
                                                                         norm=norm,
                                                                         dropout=dropout,
+                                                                        attn_op=attn_op,
                                                                         eps=eps)
         else:
             self.inter_chunk_block = GloballyAttentiveBlock(num_features,
@@ -82,6 +99,7 @@ class GALRBlock(nn.Module):
                                                             causal=causal,
                                                             norm=norm,
                                                             dropout=dropout,
+                                                            attn_op=attn_op,
                                                             eps=eps)
 
     def forward(self, input_x):
@@ -93,7 +111,6 @@ class GALRBlock(nn.Module):
         """
         x = self.intra_chunk_block(input_x)
         output = self.inter_chunk_block(x)
-
         return output
 
 
@@ -122,10 +139,11 @@ class GloballyAttentiveBlockBase(nn.Module):
 
 
 class GloballyAttentiveBlock(GloballyAttentiveBlockBase):
-    def __init__(self, num_features, num_heads=8, causal=True, norm=True, dropout=1e-1, eps=EPS):
+    def __init__(self, num_features, num_heads=8, causal=True, norm=True, dropout=1e-1, eps=EPS, attn_op=False):
         super().__init__()
 
         self.norm = norm
+        self.attn_op = attn_op
 
         if self.norm:
             self.norm2d_in = LayerNormAlongChannel(num_features, eps=eps)
@@ -155,16 +173,14 @@ class GloballyAttentiveBlock(GloballyAttentiveBlockBase):
             x = self.norm2d_in(input_x)  # -> (batch_size, num_features, S, K)
         else:
             x = input_x
-        encoding = self.positional_encoding(length=S * K, dimension=num_features).permute(1, 0).view(num_features, S,
-                                                                                                     K).to(x.device)
+        encoding = self.positional_encoding(length=S * K, dimension=num_features).permute(1, 0).view(num_features, S, K).to(x.device)
         x = x + encoding  # -> (batch_size, num_features, S, K)
         x = x.permute(2, 0, 3, 1).contiguous()  # -> (S, batch_size, K, num_features)
         x = x.view(S, batch_size * K, num_features)  # -> (S, batch_size*K, num_features)
 
         residual = x  # (S, batch_size*K, num_features)
-        x, _ = self.multihead_attn(x, x,
-                                   x)  # (T_tgt, batch_size, num_features), (batch_size, T_tgt, T_src), where T_tgt = T_src = T
-
+        x, attention = self.multihead_attn(x, x, x)  # (T_tgt, batch_size, num_features), (batch_size, T_tgt, T_src), where T_tgt = T_src = T
+        ##should use this attention
         if self.dropout:
             x = self.dropout1d(x)
         x = x + residual  # -> (S, batch_size*K, num_features)
@@ -176,16 +192,20 @@ class GloballyAttentiveBlock(GloballyAttentiveBlockBase):
         x = x + input_x
         output = x.view(batch_size, num_features, S, K)
 
-        return output
+        if not self.attn_op:
+            return output
+        else:
+            return output, attention
 
 
 class LowDimensionGloballyAttentiveBlock(GloballyAttentiveBlockBase):
-    def __init__(self, num_features, chunk_size=100, down_chunk_size=32, num_heads=8, causal=True, norm=True,
-                 dropout=1e-1, eps=EPS):
+    def __init__(self, num_features, chunk_size=100, down_chunk_size=100, num_heads=8, causal=True, norm=True,
+                 dropout=1e-1, attn_op=False, eps=EPS):
         super().__init__()
 
         self.down_chunk_size = down_chunk_size
         self.norm = norm
+        self.attn_op = attn_op
 
         self.fc_map = nn.Linear(chunk_size, down_chunk_size)
 
@@ -227,7 +247,7 @@ class LowDimensionGloballyAttentiveBlock(GloballyAttentiveBlockBase):
         x = x.view(S, batch_size * Q, num_features)  # -> (S, batch_size*Q, num_features)
 
         residual = x  # (S, batch_size*Q, num_features)
-        x, _ = self.multihead_attn(x, x, x)  # (T_tgt, batch_size, num_features), (batch_size, T_tgt, T_src), where T_tgt = T_src = T
+        x, attention = self.multihead_attn(x, x, x)  # (T_tgt, batch_size, num_features), (batch_size, T_tgt, T_src), where T_tgt = T_src = T
 
         if self.dropout:
             x = self.dropout1d(x)
@@ -242,7 +262,10 @@ class LowDimensionGloballyAttentiveBlock(GloballyAttentiveBlockBase):
         x = x + input_x
         output = x.view(batch_size, num_features, S, K)
 
-        return output
+        if self.attn_op:
+            return output, attention
+        else:
+            return output
 
 
 class LayerNormAlongChannel(nn.Module):

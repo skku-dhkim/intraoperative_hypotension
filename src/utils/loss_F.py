@@ -6,10 +6,19 @@ from torch.autograd import Variable
 
 def call_loss_fn(loss_name, **kwargs):
     if loss_name.lower() == 'tilt':
-        criterion = Tilted_Loss_()
+        if kwargs['Tau'] == 0.0:
+            criterion = Tilted_Loss_(t=kwargs['T'])
+        else:
+            criterion = Tilted_Loss(t=kwargs['T'], tau=kwargs['Tau'])
     elif loss_name.lower() == 'focal':
-        # criterion = FocalLoss(gamma=2,alpha=[0.25,0.75]) ##weight//check
-        criterion = FocalLoss(**kwargs)
+        if 'gamma' not in kwargs.keys():
+            raise ValueError('Gamma value is missing for focal loss')
+        elif 'alpha' not in kwargs.keys():
+            raise ValueError('Alpha value is missing for focal loss')
+        else:
+            criterion = FocalLoss(gamma=kwargs['gamma'], alpha=kwargs['alpha'], size_average=False)
+    elif loss_name.lower() == 'cfocal':
+        criterion = CfocalLoss(gamma=2)
     elif loss_name.lower() == 'cross':
         criterion = nn.CrossEntropyLoss()
     else:

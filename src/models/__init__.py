@@ -1,16 +1,14 @@
 from .. import *
-from .cnn import OneDimCNN, CausalOneDimCNN, MultiChannelCNN, AttentionCNN, MultiHeadAttentionCNN
+from .cnn import OneDimCNN, CausalOneDimCNN, MultiChannelCNN, AttentionCNN, MultiHeadAttentionCNN, Net
 from .rnn import ValinaLSTM
 from .galr import GALRBlock
-from .attention_galr import AttentiveGALR, MultiheadAttentionGALR
-# import torch
-# from torch import nn
+from .attention_galr import AttentiveGALR, MultiheadAttentionGALR, MultiheadAttentionGALR1
+from .prev_galr_model import GALR_best_acc
 
 
 def call_models(model_name: str,
                 features: Optional[int] = None,
                 sequences: Optional[int] = None,
-                # batch_size: Optional[int] = None,
                 num_of_classes: Optional[int] = 2,
                 **kwargs):
 
@@ -22,42 +20,22 @@ def call_models(model_name: str,
                            hidden_dim=kwargs['hidden_dim'],
                            layers=kwargs['layers'],
                            num_of_classes=num_of_classes)
-    # elif model_name.lower() == 'cnn':
-    #     hidden = False
-    #     model = OneDimCNN(data_shape[-1], hidden_dim=hidden_dim, num_of_classes=num_of_classes)
-    # elif model_name.lower() == 'causal-cnn':
-    #     # TODO: Check Future
-    #     hidden = False
-    #     model = CausalOneDimCNN(data_shape[-1], hidden_dim=hidden_dim, num_of_classes=num_of_classes)
-    # elif model_name.lower() == 'multi-channel-cnn':
-    #     hidden = False
-    #     model = MultiChannelCNN(input_size=data_shape[-1], num_of_classes=num_of_classes)
-    # elif model_name.lower() == 'attention_cnn':
-    #     hidden = False
-    #     model = AttentionCNN(input_size=data_shape[-1],
-    #                          embedding_dim=hidden_dim,
-    #                          attention_dim=attention_dim,
-    #                          sequences=data_shape[1],
-    #                          num_of_classes=2)
+    elif model_name.lower() == 'multihead_attention':
+        model = AttentionCNN(input_size=8,
+                             embedding_dim=kwargs['hidden_dim'],
+                             attention_dim=kwargs['attention_dim'],
+                             sequences=3000,
+                             num_heads=kwargs['num_heads'],
+                             num_of_classes=2)
     elif model_name.lower() == 'galr':
-        hidden = False
-        model = GALRBlock(num_features=8,
-                          hidden_channels=64,
-                          num_heads=8,
-                          norm=True,
-                          dropout=1e-1,
+        model = GALRBlock(num_features=features,
+                          hidden_channels=kwargs['hidden_channels'],
+                          num_heads=kwargs['num_heads'],
+                          norm=kwargs['norm'],
+                          dropout=kwargs['dropout'],
                           num_of_classes=2,
                           block_num=1)
 
-    # elif model_name.lower() == 'multi_head_attn':
-    #     hidden = True
-    #     model = MultiHeadAttentionCNN(
-    #         input_size=data_shape[-1],
-    #         embedding_dim=hidden_dim,
-    #         attention_dim=attention_dim,
-    #         num_heads=num_of_heads,
-    #         sequences=data_shape[1],
-    #         num_of_classes=2)
     elif model_name.lower() == 'attention_galr':
         model = AttentiveGALR(input_size=features,
                               # embedding_dim=kwargs['embedding_dim'],
@@ -78,6 +56,19 @@ def call_models(model_name: str,
             num_classes=num_of_classes,
             **kwargs
         )
+    elif model_name.lower() == 'multihead_attention_galr1':
+        model = MultiheadAttentionGALR1(
+            input_size=features,
+            sequences=sequences,
+            num_heads=kwargs['num_of_heads'],
+            num_classes=num_of_classes,
+            **kwargs
+        )
+    elif model_name.lower() == "yonsei":
+        model = Net()
+    elif model_name.lower() == "galr_prev":
+        model = GALR_best_acc(num_features=features, num_heads=kwargs['num_of_heads'],
+                              hidden_channels=kwargs['hidden_channels'])
     else:
         raise NotImplementedError()
     return model

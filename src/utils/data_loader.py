@@ -81,16 +81,20 @@ class ImbalancedDatasetSampler(Sampler):
         return self.num_samples
 
 
-def load_files(data_path: str, test_split_ratio: float) -> Tuple[list, list]:
+def load_files(data_path: str, test_split_ratio: float, fixed=False) -> Tuple[list, list]:
     """
     Args:
         data_path: (str) Dataset path that holds hdf5 format.
         test_split_ratio: (float) Split ratio of train and test set.
+        fixed: split deterministic or not
 
     Returns:
 
     """
     file_list = glob.glob(os.path.join(data_path, "*.hdf5"))
+
+    if fixed:
+        random.seed(42)
 
     random.shuffle(file_list)
     n_of_test = int(len(file_list) * test_split_ratio)

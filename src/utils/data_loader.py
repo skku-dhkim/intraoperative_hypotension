@@ -2,19 +2,18 @@
     @ Author: DONGHEE KIM.
     @ Sungkyunkwan University and Hippo T&C all rights reserved.
 """
+from .. import *
 from . import *
 from src.vitaldb_framework import vitaldb
+from torch.utils.data import DataLoader, Dataset, Sampler, WeightedRandomSampler
+from typing import Callable, Tuple
 
 import random
-import numpy as np
-import pandas as pd
 import glob
 import torch
 import h5py
 import parmap
-
-from torch.utils.data import DataLoader, Dataset, Sampler, WeightedRandomSampler
-from typing import Callable, Tuple
+import gc
 
 
 def data_load(data_path: str, attr: list, maxcases: int, interval: float) -> None:
@@ -28,62 +27,6 @@ def data_load(data_path: str, attr: list, maxcases: int, interval: float) -> Non
         interval=interval,
         maxcases=maxcases
     )
-
-
-# TODO: Deprecated in the future.
-def composite(data_path, attr):
-    df = pd.DataFrame(columns=attr)
-    total = len(glob.glob("./data/{}/original/*.csv".format(data_path)))
-    count = 0
-    for file_name in glob.glob("./data/{}/original/*.csv".format(data_path)):
-        cid = file_name.split("/")[-1].split(".")[0]
-        print("Running on : {}".format(cid))
-        tdf = pd.read_csv(file_name, header=0)
-        tdf['CID'] = cid
-        df = df.append(tdf, ignore_index=True)
-        print("Job: {}/{}".format(count, total))
-        count += 1
-
-    print("Saving...")
-    df.to_csv("./data/{}/dataset.csv".format(data_path), index=False)
-    print("[Done] Saving...")
-    return "./data/{}/dataset.csv".format(data_path)
-
-
-# TODO: Deprecated in the future.
-def matching_caseID(data_path):
-    dataset = pd.read_csv("./data/{}/dataset.csv".format(data_path))
-    case_id = dataset['CID'].unique()
-
-    try:
-        case_info = pd.read_csv("./data/total_cases.csv".format(data_path))
-        case_info['caseid'] = case_info['caseid'].apply(pd.to_numeric)
-
-        case_info = case_info[case_info['caseid'].isin(case_id)]
-        case_info.to_csv("./data/{}/case_info.csv".format(data_path), index=False)
-        print("[Done] Matching IDs...")
-    except FileNotFoundError:
-        raise FileNotFoundError("You should move or create \'total_cases.csv\' file first.")
-
-
-# TODO: Deprecated in the future.
-class VitalDataset(Dataset):
-    def __init__(self, x_tensor, y_tensor):
-        super(Dataset, self).__init__()
-        self.x = x_tensor
-        self.y = y_tensor
-
-    def __getitem__(self, index):
-        x = np.array(self.x[index], dtype=np.float32)
-        y = np.array(self.y[index], dtype=np.int64)
-        return x, y
-
-    def __len__(self):
-        return len(self.x)
-
-    def get_labels(self):
-        return list(self.y)
-
 
 # TODO: Need to be checked.
 class ImbalancedDatasetSampler(Sampler):
@@ -138,16 +81,20 @@ class ImbalancedDatasetSampler(Sampler):
         return self.num_samples
 
 
-def load_files(data_path: str, test_split_ratio: float) -> Tuple[list, list]:
+def load_files(data_path: str, test_split_ratio: float, fixed=False) -> Tuple[list, list]:
     """
     Args:
         data_path: (str) Dataset path that holds hdf5 format.
         test_split_ratio: (float) Split ratio of train and test set.
+        fixed: split deterministic or not
 
     Returns:
 
     """
     file_list = glob.glob(os.path.join(data_path, "*.hdf5"))
+
+    if fixed:
+        random.seed(42)
 
     random.shuffle(file_list)
     n_of_test = int(len(file_list) * test_split_ratio)
@@ -157,13 +104,28 @@ def load_files(data_path: str, test_split_ratio: float) -> Tuple[list, list]:
     return train_file_list, test_file_list
 
 
+class BasicDataset(Dataset):
+    def __init__(self, data_x, data_y):
+        super(BasicDataset, self).__init__()
+        self.x = data_x
+        self.y = data_y
+
+    def __getitem__(self, item):
+        x = np.array(self.x[item], dtype=np.float64)
+        y = np.array(self.y[item], dtype=np.int64)
+        return x, y
+
+    def __len__(self):
+        return len(self.y)
+
+
 class HDF5_VitalDataset(Dataset):
     def __init__(self, file_lists: list):
         super().__init__()
         self.x, self.y = self._load_from_hdf5(file_lists)
 
     def __getitem__(self, index):
-        x = np.array(self.x[index], dtype=np.float32)
+        x = np.array(self.x[index], dtype=np.float64)
         y = np.array(self.y[index], dtype=np.int64)
         return x, y
 
@@ -182,7 +144,7 @@ class HDF5_VitalDataset(Dataset):
         return list(self.y)
 
     def get_shape(self) -> tuple:
-        return self.x.shape
+        return self.x.shape, self.y.shape
 
     def label_counts(self) -> dict:
         unique, counts = np.unique(self.y, return_counts=True)
@@ -198,7 +160,7 @@ class HDF5_VitalDataset(Dataset):
         result_x = []
         result_y = []
 
-        result = parmap.map(read_HDF5, file_lists, pm_pbar=True, pm_processes=cpu_counts)
+        result = parmap.map(read_HDF5, file_lists, pm_pbar=True, pm_processes=os.cpu_count())
 
         pbar = tqdm(total=len(result), desc='Making numpy array', mininterval=0.01)
         while result:
@@ -210,12 +172,30 @@ class HDF5_VitalDataset(Dataset):
             result_x.append(res[0])
             result_y.append(res[1])
             del res
+            gc.collect()
             pbar.update(1)
 
         result_x = np.concatenate(result_x, axis=0)
         result_y = np.concatenate(result_y, axis=0)
 
         return result_x, result_y
+
+    def set_valid(self) -> Dataset:
+        result_0 = np.where(self.y == 0)[0]
+        result_1 = np.where(self.y == 1)[0]
+
+        sample_0 = np.random.choice(result_0, int(len(result_0)*0.1), replace=True)
+        sample_1 = np.random.choice(result_1, int(len(result_1)*0.1), replace=True)
+
+        indices = np.append(sample_0, sample_1, axis=0)
+        valid_x = self.x[indices]
+        valid_y = self.y[indices]
+
+        self.x = np.delete(self.x, indices, axis=0)
+        self.y = np.delete(self.y, indices, axis=0)
+
+        valid_set = BasicDataset(valid_x, valid_y)
+        return valid_set
 
 
 def read_HDF5(file: str) -> Tuple[np.ndarray, np.ndarray]:

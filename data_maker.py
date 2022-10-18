@@ -16,9 +16,6 @@ if __name__ == '__main__':
     parser.add_argument("--time_step", type=int, default=10)
     parser.add_argument("--target_seq", type=int, default=30000)
     parser.add_argument("--interval", type=float, default=0.01)
-    # parser.add_argument("--test_split", type=float, default=0.2)
-    # parser.add_argument("--norm", type=str, default='std')
-
     parser.add_argument("--maxcase", type=int, default=-1)
 
     args = parser.parse_args()
@@ -33,6 +30,8 @@ if __name__ == '__main__':
                   "Primus/MAC",
                   "Primus/CO2",
                   "BIS/BIS"]
+
+
     if args.data_load:
         # 1. load from vital DB framework
         dl.data_load(args.dset_path, attributes, args.maxcase, args.interval)

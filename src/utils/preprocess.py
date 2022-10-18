@@ -1,13 +1,12 @@
-import pandas as pd
-import glob
-import h5py
-import pickle
+from .. import *
 from . import *
-
-from tqdm import tqdm
 from sklearn.preprocessing import StandardScaler
 from datetime import datetime
 from multiprocessing import Process
+
+import glob
+import h5py
+import pickle
 
 
 def job(file: str, time_seq: int, time_delay: int, prediction_lag: int, dst_path: str) -> None:
@@ -21,6 +20,7 @@ def job(file: str, time_seq: int, time_delay: int, prediction_lag: int, dst_path
     df = labeling(input_df=df)
     # Data split
     data_split(cid, df, time_seq=time_seq, time_delay=time_delay, target_seq=prediction_lag, dst_path=dst_path)
+
 
 
 def make_dataset(data_path: str, time_seq: int, time_step: int, target_seq: int, dst_path: str) -> None:
@@ -44,7 +44,7 @@ def make_dataset(data_path: str, time_seq: int, time_step: int, target_seq: int,
         p.start()
         processes.append(p)
 
-        if len(processes) >= cpu_counts:
+        if len(processes) >= os.cpu_count():
             while processes:
                 _p = processes.pop()
                 _p.join()
@@ -81,7 +81,11 @@ def data_split(
     }
 
     # NOTE: Make X values and Y values.
-    pd_x = dataframe.iloc[:, 1:-1]
+    #pd_x = dataframe.iloc[:, 1:-1]
+
+    # #use loc for unsorted clinical indexer
+    pd_x = dataframe.loc[:, ['ECG_II', 'NIBP_SBP', 'NIBP_MBP', 'NIBP_DBP', 'PLETH', 'MAC', 'CO2', 'BIS']]
+
     pd_y = dataframe.iloc[:, -1]
     pd_y = pd_y.replace({'normal': 0, 'low': 1, pd.NA: -1})
 
@@ -108,6 +112,12 @@ def data_split(
     save_path = os.path.join(dst_path, date_time)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
+
+    if not os.path.exists(os.path.join(save_path, "Datameta.txt")):
+        with open(os.path.join(save_path, "Datameta.txt"), "w") as file:
+            file.write("time_seq: {}\n".format(time_seq))
+            file.write("target_seq: {}\n".format(target_seq))
+            file.write("time_delay: {}\n".format(time_delay))
 
     save_path = os.path.join(save_path, "{}.hdf5".format(cid))
 
@@ -160,8 +170,11 @@ def eliminate_na(data_frame: DataFrame) -> DataFrame:
     _data_frame = data_frame.copy(deep=True)
 
     # NOTE: 1. Extract valid range which Solar8000/NIBP_SBP value exist.
-    first_idx = _data_frame['Solar8000/NIBP_SBP'].first_valid_index()
-    last_idx = _data_frame['Solar8000/NIBP_SBP'].last_valid_index()
+    #first_idx = _data_frame['Solar8000/NIBP_SBP'].first_valid_index()
+    #last_idx = _data_frame['Solar8000/NIBP_SBP'].last_valid_index()
+    first_idx = _data_frame['NIBP_SBP'].first_valid_index()
+    last_idx = _data_frame['NIBP_SBP'].last_valid_index()
+
     _data_frame = _data_frame.loc[first_idx:last_idx]
 
     # NOTE: 2. Fill the value if NA exists. But not redundantly 300 times.
@@ -190,10 +203,10 @@ def labeling(input_df=None, dataset_path=None) -> DataFrame:
     # values = ["low", "high", "normal"]
     values = ["low", "normal", pd.NA]
     conditions = [
-        (df['Solar8000/NIBP_SBP'] < 90),
+        (df['NIBP_SBP'] < 90),
         # (df['Solar8000/NIBP_SBP'] > 180),
-        (df['Solar8000/NIBP_SBP'] >= 90),
-        (df['Solar8000/NIBP_SBP'].isna())
+        (df['NIBP_SBP'] >= 90),
+        (df['NIBP_SBP'].isna())
     ]
     df['Target'] = np.select(conditions, values)
 

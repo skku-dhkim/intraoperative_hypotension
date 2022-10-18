@@ -10,8 +10,8 @@ class GALR(nn.Module):
     def __init__(self,
                  num_features,
                  hidden_channels,
-                 num_blocks=3, #size change
-                 num_heads=8,
+                #num_blocks=3, #size change
+                 num_heads=6,
                  norm=True,
                  dropout=1e-1,
                  low_dimension=True,
@@ -23,6 +23,7 @@ class GALR(nn.Module):
         # Network configuration
         net = []
 
+        num_blocks = kwargs['num_blocks']
         for _ in range(num_blocks-1):
             net.append(GALRBlock(num_features,
                                  hidden_channels,
@@ -56,7 +57,6 @@ class GALR(nn.Module):
             input_x (batch_size, num_features, S, chunk_size)
         Returns:
             output (batch_size, num_features, S, chunk_size)
-
         """
 
         output = self.net(input_x)
@@ -469,6 +469,7 @@ class Segment1d(nn.Module):
 
         input_x = input_x.view(batch_size, num_features, n_frames, 1)
         x = F.unfold(input_x, kernel_size=(chunk_size, 1), stride=(hop_size, 1)) # -> (batch_size, num_features*chunk_size, S), where S = (n_frames-chunk_size)//hop_size+1
+
         x = x.view(batch_size, num_features, chunk_size, -1)
         output = x.permute(0, 1, 3, 2).contiguous() # -> (batch_size, num_features, S, chunk_size)
 

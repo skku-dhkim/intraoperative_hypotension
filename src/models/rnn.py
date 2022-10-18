@@ -4,13 +4,17 @@ from torch import nn
 
 
 class ValinaLSTM(nn.Module):
-    def __init__(self, input_size: int, hidden_size: int, num_of_classes: int, **kwargs):
+    def __init__(self, **kwargs):
         super(ValinaLSTM, self).__init__()
+        self.name = self.__class__.__name__
         self.layers = kwargs['layers']
-        self.hidden_units = hidden_size
-        self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=layers)
-        self.linear = nn.Linear(hidden_size, 128)
-        self.fc = nn.Linear(128, num_of_classes)
+        self.hidden_units = kwargs['hidden_units']
+        self.lstm = nn.LSTM(input_size=kwargs['features'],
+                            hidden_size=kwargs['hidden_units'],
+                            num_layers=kwargs['layers'],
+                            bidirectional=kwargs['bidirectional'])
+        self.linear = nn.Linear(kwargs['hidden_units'], 128)
+        self.fc = nn.Linear(128, kwargs['number_of_classes'])
 
     def forward(self, X, hidden):
         X = X.transpose(0, 1)
@@ -19,9 +23,10 @@ class ValinaLSTM(nn.Module):
         out = self.linear(outputs)
         out = F.relu(out)
         out = self.fc(out)
-        return out
+        return out, hidden
 
     def init_hidden(self, batch_size, device):
-        hidden = (torch.ones(self.layer, batch_size, self.hidden_units, device=device),
-                  torch.ones(self.layer, batch_size, self.hidden_units, device=device))
+        # hidden = torch.zeros(2, self.hidden_units, dtype=torch.float64)
+        hidden = (torch.ones(self.layers, batch_size, self.hidden_units, device=device, dtype=torch.float64),
+                  torch.ones(self.layers, batch_size, self.hidden_units, device=device, dtype=torch.float64))
         return hidden

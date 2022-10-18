@@ -111,7 +111,7 @@ class BasicDataset(Dataset):
         self.y = data_y
 
     def __getitem__(self, item):
-        x = np.array(self.x[item], dtype=np.float32)
+        x = np.array(self.x[item], dtype=np.float64)
         y = np.array(self.y[item], dtype=np.int64)
         return x, y
 
@@ -125,7 +125,7 @@ class HDF5_VitalDataset(Dataset):
         self.x, self.y = self._load_from_hdf5(file_lists)
 
     def __getitem__(self, index):
-        x = np.array(self.x[index], dtype=np.float32)
+        x = np.array(self.x[index], dtype=np.float64)
         y = np.array(self.y[index], dtype=np.int64)
         return x, y
 
